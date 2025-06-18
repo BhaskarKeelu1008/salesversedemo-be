@@ -1,0 +1,346 @@
+{
+  "aobModels": {
+    "description": "AOB (Agent Onboarding) Models for managing insurance agent applications and documents",
+    "models": {
+      "aobApplication": {
+        "modelName": "AobApplication",
+        "collection": "aobapplications",
+        "description": "Main application model for agent onboarding process",
+        "fields": {
+          "_id": {
+            "type": "ObjectId",
+            "required": true,
+            "description": "Unique identifier for the application"
+          },
+          "firstName": {
+            "type": "String",
+            "required": true,
+            "description": "Applicant's first name"
+          },
+          "middleName": {
+            "type": "String",
+            "required": false,
+            "description": "Applicant's middle name (optional)"
+          },
+          "lastName": {
+            "type": "String",
+            "required": true,
+            "description": "Applicant's last name"
+          },
+          "emailAddress": {
+            "type": "String",
+            "required": true,
+            "description": "Applicant's email address (lowercase, unique)"
+          },
+          "mobileNumber": {
+            "type": "String",
+            "required": true,
+            "description": "Applicant's mobile phone number"
+          },
+          "address": {
+            "type": "String",
+            "required": true,
+            "description": "Applicant's residential address"
+          },
+          "passedLifeInsuranceExam": {
+            "type": "Boolean",
+            "required": true,
+            "default": false,
+            "description": "Whether applicant passed life insurance exam"
+          },
+          "passedLifeInsuranceExamRating": {
+            "type": "String",
+            "required": false,
+            "description": "Rating/score from life insurance exam"
+          },
+          "passedLifeInsuranceExamDateOfExam": {
+            "type": "String",
+            "required": false,
+            "description": "Date when life insurance exam was taken"
+          },
+          "passedLifeInsuranceExamVenueOfExam": {
+            "type": "String",
+            "required": false,
+            "description": "Venue where life insurance exam was taken"
+          },
+          "hasLifeInsuranceCompany": {
+            "type": "Boolean",
+            "required": true,
+            "default": false,
+            "description": "Whether applicant has experience with life insurance company"
+          },
+          "hasLifeInsuranceCompanyName": {
+            "type": "String",
+            "required": false,
+            "description": "Name of life insurance company (if applicable)"
+          },
+          "hasNonLifeInsuranceCompany": {
+            "type": "Boolean",
+            "required": true,
+            "default": false,
+            "description": "Whether applicant has experience with non-life insurance company"
+          },
+          "hasNonLifeInsuranceCompanyName": {
+            "type": "String",
+            "required": false,
+            "description": "Name of non-life insurance company (if applicable)"
+          },
+          "hasVariableInsuranceCompany": {
+            "type": "Boolean",
+            "required": true,
+            "default": false,
+            "description": "Whether applicant has experience with variable insurance company"
+          },
+          "hasVariableInsuranceCompanyName": {
+            "type": "String",
+            "required": false,
+            "description": "Name of variable insurance company (if applicable)"
+          },
+          "relatedToPhillifeEmployee": {
+            "type": "Boolean",
+            "required": true,
+            "default": false,
+            "description": "Whether applicant is related to any Phillife employee"
+          },
+          "relatedToPhillifeEmployeeName": {
+            "type": "String",
+            "required": false,
+            "description": "Name of related Phillife employee (if applicable)"
+          },
+          "relatedToPhillifeEmployeeRelationShip": {
+            "type": "String",
+            "required": false,
+            "description": "Relationship to Phillife employee (if applicable)"
+          },
+          "applicationStatus": {
+            "type": "String",
+            "required": true,
+            "enum": [
+              "applicationSubmitted",
+              "underReview",
+              "rejected",
+              "approved",
+              "returned"
+            ],
+            "default": "applicationSubmitted",
+            "description": "Current status of the application"
+          },
+          "rejectRemark": {
+            "type": "String",
+            "required": false,
+            "description": "Reason for rejection (if applicable)"
+          },
+          "applicationId": {
+            "type": "String",
+            "required": true,
+            "unique": true,
+            "example": "APP25057802713",
+            "description": "Unique human-readable application identifier"
+          },
+          "qcAndDiscrepencyList": {
+            "type": "Array",
+            "description": "List of quality control and discrepancy items",
+            "schema": {
+              "documentType": {
+                "type": "String",
+                "required": true,
+                "description": "Type of document with discrepancy"
+              },
+              "documentName": {
+                "type": "String",
+                "required": true,
+                "description": "Name of document with discrepancy"
+              },
+              "remarks": {
+                "type": "String",
+                "required": true,
+                "description": "QC remarks or discrepancy details"
+              },
+              "createdAt": {
+                "type": "Date",
+                "default": "new Date()",
+                "description": "When the QC item was created"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the application was created"
+          },
+          "updatedAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the application was last updated"
+          }
+        },
+        "indexes": [
+          { "field": "applicationId", "type": "unique" },
+          { "field": "emailAddress", "type": "single" },
+          { "field": "applicationStatus", "type": "single" },
+          { "field": "createdAt", "type": "descending" }
+        ]
+      },
+      "aobDocumentMaster": {
+        "modelName": "AobDocumentMaster",
+        "collection": "aobdocumentmasters",
+        "description": "Master data for document types and requirements",
+        "fields": {
+          "_id": {
+            "type": "ObjectId",
+            "required": true,
+            "description": "Unique identifier for the document master"
+          },
+          "documentName": {
+            "type": "String",
+            "required": true,
+            "description": "Name of the document type"
+          },
+          "documentType": {
+            "type": "String",
+            "required": true,
+            "description": "Type/category of the document"
+          },
+          "documentDescription": {
+            "type": "String",
+            "required": true,
+            "description": "Detailed description of the document"
+          },
+          "documentInstruction": {
+            "type": "String",
+            "required": true,
+            "description": "Instructions for submitting this document"
+          },
+          "category": {
+            "type": "String",
+            "required": true,
+            "description": "Document category for grouping"
+          },
+          "createdAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the document master was created"
+          },
+          "updatedAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the document master was last updated"
+          }
+        },
+        "indexes": [
+          { "field": "documentType", "type": "single" },
+          { "field": "category", "type": "single" },
+          { "field": "documentName", "type": "single" }
+        ]
+      },
+      "aobDocument": {
+        "modelName": "AobDocument",
+        "collection": "aobdocuments",
+        "description": "Individual documents uploaded for applications",
+        "fields": {
+          "_id": {
+            "type": "ObjectId",
+            "required": true,
+            "description": "Unique identifier for the document"
+          },
+          "presignedS3Url": {
+            "type": "String",
+            "required": true,
+            "description": "Pre-signed S3 URL for document access"
+          },
+          "documentId": {
+            "type": "String",
+            "required": true,
+            "unique": true,
+            "example": "AOB_2025_8484939494",
+            "description": "Unique human-readable document identifier"
+          },
+          "applicationId": {
+            "type": "ObjectId",
+            "required": true,
+            "ref": "AobApplication",
+            "description": "Reference to the associated application"
+          },
+          "documentStatus": {
+            "type": "String",
+            "required": true,
+            "enum": ["approve", "reject", "documentSubmitted"],
+            "default": "documentSubmitted",
+            "description": "Current status of the document"
+          },
+          "remarks": {
+            "type": "String",
+            "required": false,
+            "description": "Comments or remarks about the document"
+          },
+          "documentType": {
+            "type": "String",
+            "required": true,
+            "enum": ["pdf", "png", "jpg"],
+            "description": "File type of the uploaded document"
+          },
+          "documentName": {
+            "type": "String",
+            "required": true,
+            "description": "Name of the uploaded document"
+          },
+          "createdAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the document was uploaded"
+          },
+          "updatedAt": {
+            "type": "Date",
+            "default": "new Date()",
+            "description": "When the document was last updated"
+          }
+        },
+        "indexes": [
+          { "field": "documentId", "type": "unique" },
+          { "field": "applicationId", "type": "single" },
+          { "field": "documentStatus", "type": "single" },
+          { "field": "documentType", "type": "single" },
+          { "field": "createdAt", "type": "descending" }
+        ]
+      }
+    },
+    "relationships": {
+      "aobDocument_to_aobApplication": {
+        "type": "many-to-one",
+        "description": "Multiple documents can belong to one application",
+        "foreignKey": "applicationId",
+        "references": "AobApplication._id"
+      }
+    },
+    "businessRules": {
+      "applicationId": {
+        "format": "APP + timestamp/random",
+        "example": "APP25057802713",
+        "uniqueness": "Must be unique across all applications"
+      },
+      "documentId": {
+        "format": "AOB_YYYY_randomnumber",
+        "example": "AOB_2025_8484939494",
+        "uniqueness": "Must be unique across all documents"
+      },
+      "applicationStatus": {
+        "workflow": [
+          "applicationSubmitted",
+          "underReview",
+          "rejected/approved/returned"
+        ],
+        "description": "Status progression through the application lifecycle"
+      },
+      "documentStatus": {
+        "workflow": ["documentSubmitted", "approve/reject"],
+        "description": "Status progression for document review"
+      }
+    },
+    "useCases": {
+      "agentOnboarding": "Complete workflow for onboarding new insurance agents",
+      "documentManagement": "Upload, review, and approve required documents",
+      "qualityControl": "Track discrepancies and quality issues",
+      "statusTracking": "Monitor application progress through various stages"
+    }
+  }
+}
