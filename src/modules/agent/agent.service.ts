@@ -637,7 +637,7 @@ export class AgentService implements IAgentService {
       await Promise.all(
         filteredHierarchies.map(async hierarchy => {
           const designations = await designationService.getDesignationsByHierarchyId(
-            hierarchy.hierarchyId
+            hierarchy.hierarchyId,
           );
 
           const agentPromises = designations.map(async designation => {
@@ -650,7 +650,7 @@ export class AgentService implements IAgentService {
                 agent.firstName && 
                 agent.lastName && 
                 !agent.isDeleted && 
-                agent.agentStatus === 'active'
+                agent.agentStatus === 'active',
               )
               .map(agent => ({
                 firstName: agent.firstName!,
@@ -665,7 +665,7 @@ export class AgentService implements IAgentService {
           if (hierarchyAgents.length > 0) {
             hierarchyAgentsMap.set(hierarchy.hierarchyId, hierarchyAgents);
           }
-        })
+        }),
       );
 
       // Filter out hierarchies with no agents and combine the data

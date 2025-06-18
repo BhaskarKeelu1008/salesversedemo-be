@@ -623,6 +623,65 @@ class LeadService extends BaseService {
       throw new BadRequestException((error as Error).message);
     }
   }
+
+  public async getLeadsByCreator(
+    createdBy: string,
+    page = 1,
+    limit = 10,
+  ): Promise<PaginatedResponse<ILead>> {
+    try {
+      // Validate createdBy is a valid ObjectId
+      if (!Types.ObjectId.isValid(createdBy)) {
+        throw new BadRequestException('Invalid creator ID format');
+      }
+
+      const query = { createdBy: new Types.ObjectId(createdBy) };
+      const skip = (page - 1) * limit;
+
+      // Execute count and find queries in parallel
+      const [total, leads] = await Promise.all([
+        Lead.countDocuments(query),
+        Lead.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate([
+            {
+              path: 'allocatedTo',
+              select: 'firstName lastName email agentCode',
+            },
+            {
+              path: 'allocatedBy',
+              select: 'firstName lastName email agentCode',
+            },
+            {
+              path: 'createdBy',
+              select: 'firstName lastName email agentCode',
+            },
+          ]),
+      ]);
+
+      if (total === 0) {
+        throw new NotFoundException('No leads found for this creator');
+      }
+
+      return {
+        data: leads,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException((error as Error).message);
+    }
+  }
 }
 
 export const leadService = new LeadService();

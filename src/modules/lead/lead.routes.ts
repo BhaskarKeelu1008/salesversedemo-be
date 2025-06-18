@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { leadController } from './lead.controller';
+import { ValidationPipe } from '@/common/pipes/validation.pipe';
+import { LeadCreatorQueryDto } from './dto/lead-query.dto';
+import { authenticateJwt } from '@/middleware/auth.middleware';
 
 const router: Router = Router();
 
@@ -213,6 +216,108 @@ const router: Router = Router();
  *                   example: "Invalid createdBy: Must be a valid ObjectId"
  */
 router.get('/search/filter', leadController.getFilteredLeads);
+
+/**
+ * @openapi
+ * /api/leads/creator/{createdBy}:
+ *   get:
+ *     tags:
+ *       - Leads
+ *     summary: Get leads created by a specific user
+ *     description: Retrieves all leads created by the specified user, sorted by creation date (newest first)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: createdBy
+ *         required: true
+ *         schema:
+ *           type: string
+ *           pattern: '^[0-9a-fA-F]{24}$'
+ *         description: MongoDB ObjectId of the creator user
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Leads retrieved successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CreateLead'
+ *                     total:
+ *                       type: integer
+ *                       example: 25
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 10
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 3
+ *       400:
+ *         description: Bad Request - Invalid creator ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid creator ID format"
+ *       404:
+ *         description: Not Found - No leads found for this creator
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "No leads found for this creator"
+ *       401:
+ *         description: Unauthorized - Authentication required
+ */
+router.get(
+  '/creator/:createdBy',
+  authenticateJwt,
+  ValidationPipe.validateQuery(LeadCreatorQueryDto),
+  leadController.getLeadsByCreator,
+);
 
 /**
  * @openapi

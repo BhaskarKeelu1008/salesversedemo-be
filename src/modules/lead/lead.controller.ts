@@ -5,6 +5,9 @@ import type { ILead } from '@/models/lead.model';
 import { HTTP_STATUS } from '@/common/constants/http-status.constants';
 import { BadRequestException } from '@/common/exceptions/bad-request.exception';
 import { Types } from 'mongoose';
+import { NotFoundException } from '@/common/exceptions/not-found.exception';
+import type { ValidatedRequest } from '@/common/interfaces/validation.interface';
+import type { LeadCreatorQueryDto } from './dto/lead-query.dto';
 
 type LeadFilter =
   | 'today'
@@ -372,6 +375,37 @@ class LeadController extends BaseController {
 
       this.sendSuccess(res, leads);
     } catch (error) {
+      this.handleError(error as Error, res);
+    }
+  };
+
+  public getLeadsByCreator = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const { createdBy } = req.params;
+      const queryParams = (req as ValidatedRequest<LeadCreatorQueryDto>)
+        .validatedQuery;
+
+      const page = parseInt(queryParams.page ?? '1', 10);
+      const limit = parseInt(queryParams.limit ?? '10', 10);
+
+      if (!createdBy || !Types.ObjectId.isValid(createdBy)) {
+        throw new BadRequestException('Invalid creator ID format');
+      }
+
+      const leads = await leadService.getLeadsByCreator(createdBy, page, limit);
+      this.sendSuccess(res, leads, 'Leads retrieved successfully');
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        this.sendNotFound(res, error.message);
+        return;
+      }
+      if (error instanceof BadRequestException) {
+        this.sendBadRequest(res, error.message);
+        return;
+      }
       this.handleError(error as Error, res);
     }
   };
