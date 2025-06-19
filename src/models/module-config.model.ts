@@ -3,20 +3,15 @@ import type { IBaseModel } from './base.model';
 import type { IModule } from './module.model';
 import type { IProject } from './project.model';
 
-export interface IConfigValue {
-  key: string;
-  value: string;
-  displayName?: string;
-  dependentValues?: string[];
-}
-
+/** Interface for flexible config fields */
 export interface IConfigField {
   fieldName: string;
   fieldType: string;
   description?: string;
-  values: IConfigValue[];
+  values: any[]; // Fully flexible
 }
 
+/** Main interface */
 export interface IModuleConfig extends IBaseModel {
   moduleId: Types.ObjectId | IModule;
   projectId?: Types.ObjectId | IProject;
@@ -24,43 +19,25 @@ export interface IModuleConfig extends IBaseModel {
   description?: string;
   fields: IConfigField[];
   metadata?: Record<string, unknown>;
+  isDeleted?: boolean;
+  deletedAt?: Date | null;
 }
 
-const configValueSchema = new Schema<IConfigValue>({
-  key: {
-    type: String,
-    required: true,
+// Field schema for each field in the module config
+const configFieldSchema = new Schema<IConfigField>(
+  {
+    fieldName: { type: String, required: true },
+    fieldType: { type: String, required: true },
+    description: { type: String },
+    values: {
+      type: [Schema.Types.Mixed] as any, // Free-form array of any structure
+      required: true,
+    },
   },
-  value: {
-    type: String,
-    required: true,
-  },
-  displayName: {
-    type: String,
-  },
-  dependentValues: {
-    type: [String],
-  },
-});
+  { _id: false }, // Prevents auto-generating _id for each field
+);
 
-const configFieldSchema = new Schema<IConfigField>({
-  fieldName: {
-    type: String,
-    required: true,
-  },
-  fieldType: {
-    type: String,
-    required: true,
-  },
-  description: {
-    type: String,
-  },
-  values: {
-    type: [configValueSchema],
-    required: true,
-  },
-});
-
+// Full module config schema
 const moduleConfigSchema = new Schema<IModuleConfig>(
   {
     moduleId: {
@@ -96,7 +73,7 @@ const moduleConfigSchema = new Schema<IModuleConfig>(
     },
   },
   {
-    timestamps: true,
+    timestamps: true, // adds createdAt and updatedAt
     collection: 'moduleConfigs',
   },
 );
@@ -112,9 +89,11 @@ moduleConfigSchema.index({ configName: 1 });
 moduleConfigSchema.index({ isDeleted: 1 });
 moduleConfigSchema.index({ createdAt: -1 });
 
+// Enable virtuals
 moduleConfigSchema.set('toJSON', { virtuals: true });
 moduleConfigSchema.set('toObject', { virtuals: true });
 
+// Export model
 export const ModuleConfigModel = model<IModuleConfig>(
   'ModuleConfig',
   moduleConfigSchema,

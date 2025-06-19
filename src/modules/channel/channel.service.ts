@@ -206,6 +206,29 @@ export class ChannelService implements IChannelService {
     }
   }
 
+  public async getChannelsByProjectId(
+    projectId: string,
+  ): Promise<ChannelResponseDto[]> {
+    try {
+      logger.debug('Getting channels by project ID', { projectId });
+      const channels = await this.channelRepository.findByProjectId(projectId);
+
+      logger.debug('Channels retrieved by project ID successfully', {
+        count: channels.length,
+        projectId,
+      });
+      return channels.map(channel => this.mapToResponseDto(channel));
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to get channels by project ID:', {
+        error: err.message,
+        stack: err.stack,
+        projectId,
+      });
+      throw error;
+    }
+  }
+
   private mapToResponseDto(channel: IChannel): ChannelResponseDto {
     return {
       _id: channel._id,

@@ -1,5 +1,5 @@
 import { Schema, model, type Types } from 'mongoose';
-import type { IBaseModel } from './base.model';
+import type { IBaseModel } from '@/models/base.model';
 
 export interface ILead extends IBaseModel {
   firstName: string;
@@ -56,6 +56,8 @@ export interface ILead extends IBaseModel {
   allocatedAt: Date;
   allocatorsRemark?: string;
   remarkFromUser?: string;
+  projectId?: Types.ObjectId;
+  moduleId?: Types.ObjectId;
 }
 
 const leadSchema = new Schema<ILead>(
@@ -116,6 +118,8 @@ const leadSchema = new Schema<ILead>(
     allocatedAt: { type: Date, default: Date.now },
     allocatorsRemark: String,
     remarkFromUser: String,
+    projectId: { type: Schema.Types.ObjectId, ref: 'Project' },
+    moduleId: { type: Schema.Types.ObjectId, ref: 'Module' },
   },
   {
     timestamps: true,

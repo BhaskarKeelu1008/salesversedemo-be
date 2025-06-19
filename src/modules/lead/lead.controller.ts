@@ -44,6 +44,8 @@ interface CreateLeadRequest {
   allocatedTo: string;
   allocatedBy: string;
   createdBy: string;
+  projectId?: string;
+  moduleId?: string;
   [key: string]: unknown;
 }
 
@@ -88,11 +90,14 @@ class LeadController extends BaseController {
       }
 
       // Convert string IDs to ObjectIds
+      const { projectId, moduleId, ...restBody } = req.body;
       const leadData: Partial<ILead> = {
-        ...req.body,
+        ...restBody,
         allocatedTo: new Types.ObjectId(req.body.allocatedTo),
         allocatedBy: new Types.ObjectId(req.body.allocatedBy),
         createdBy: new Types.ObjectId(req.body.createdBy),
+        ...(projectId && { projectId: new Types.ObjectId(projectId) }),
+        ...(moduleId && { moduleId: new Types.ObjectId(moduleId) }),
       };
 
       // Create lead
@@ -144,6 +149,8 @@ class LeadController extends BaseController {
         'allocatedTo',
         'allocatedBy',
         'createdBy',
+        'projectId',
+        'moduleId',
       ] as const;
       type ObjectIdField = (typeof objectIdFields)[number];
 

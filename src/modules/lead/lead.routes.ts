@@ -7,7 +7,7 @@ import { authenticateJwt } from '@/middleware/auth.middleware';
 const router: Router = Router();
 
 /**
- * @openapi
+ * @swagger
  * components:
  *   schemas:
  *     Address:
@@ -140,17 +140,25 @@ const router: Router = Router();
  *           type: string
  *           format: uuid
  *           description: Creator user ID
+ *         projectId:
+ *           type: string
+ *           format: uuid
+ *           description: Project ID for module configuration lookup
+ *         moduleId:
+ *           type: string
+ *           format: uuid
+ *           description: Module ID for configuration lookup
  */
 
 /**
- * @openapi
+ * @swagger
  * tags:
  *   name: Leads
  *   description: Lead management endpoints
  */
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/search/filter:
  *   get:
  *     tags:
@@ -218,7 +226,7 @@ const router: Router = Router();
 router.get('/search/filter', leadController.getFilteredLeads);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/creator/{createdBy}:
  *   get:
  *     tags:
@@ -320,7 +328,7 @@ router.get(
 );
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/status/{userId}:
  *   get:
  *     tags:
@@ -339,7 +347,7 @@ router.get(
 router.get('/status/:userId', leadController.getLeadStatusCounts);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/{id}/ownership:
  *   put:
  *     tags:
@@ -380,7 +388,7 @@ router.get('/status/:userId', leadController.getLeadStatusCounts);
 router.put('/:id/ownership', leadController.changeLeadOwnership);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/{id}:
  *   get:
  *     tags:
@@ -403,7 +411,7 @@ router.put('/:id/ownership', leadController.changeLeadOwnership);
 router.get('/:id', leadController.getLead);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads:
  *   post:
  *     tags:
@@ -425,7 +433,7 @@ router.get('/:id', leadController.getLead);
 router.post('/', leadController.createLead);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/{id}:
  *   put:
  *     tags:
@@ -449,7 +457,7 @@ router.post('/', leadController.createLead);
 router.put('/:id', leadController.updateLead);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/{id}/history:
  *   get:
  *     tags:
@@ -518,7 +526,7 @@ router.put('/:id', leadController.updateLead);
 router.get('/:id/history', leadController.getLeadHistory);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/{id}/status-count:
  *   get:
  *     tags:
@@ -544,7 +552,7 @@ router.get('/:id/history', leadController.getLeadHistory);
 router.get('/:id/status-count', leadController.getStatusCount);
 
 /**
- * @openapi
+ * @swagger
  * /api/leads/advanced/filter:
  *   get:
  *     tags:

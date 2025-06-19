@@ -448,4 +448,63 @@ router.get('/:id', channelController.getChannelById);
  */
 router.get('/code/:code', channelController.getChannelByCode);
 
+/**
+ * @swagger
+ * /api/channels/project/{projectId}:
+ *   get:
+ *     tags: [Channels]
+ *     summary: Get channels by project ID
+ *     description: Retrieves all channels associated with a specific project
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Project's unique identifier (MongoDB ObjectId)
+ *         example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       200:
+ *         description: Channels retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/ChannelResponse'
+ *             example:
+ *               success: true
+ *               message: "Channels retrieved successfully"
+ *               data:
+ *                 - _id: "507f1f77bcf86cd799439011"
+ *                   channelName: "Email Marketing"
+ *                   channelCode: "EMAIL_MKT"
+ *                   channelStatus: "active"
+ *                   createdAt: "2024-01-15T10:30:00.000Z"
+ *                   updatedAt: "2024-01-15T10:30:00.000Z"
+ *               timestamp: "2024-01-15T10:30:00.000Z"
+ *       400:
+ *         description: Bad request - invalid project ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Invalid project ID format"
+ *               timestamp: "2024-01-15T10:30:00.000Z"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/project/:projectId', channelController.getChannelsByProjectId);
+
 export default router;
