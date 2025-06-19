@@ -10,6 +10,7 @@ export interface IAgentRepository {
   findByCode(code: string): Promise<IAgent | null>;
   findActiveAgents(): Promise<IAgent[]>;
   findAgentsByChannelId(channelId: string): Promise<IAgent[]>;
+  findAgentsByProjectId(projectId: string): Promise<IAgent[]>;
   findAgentsByUserId(userId: string): Promise<IAgent[]>;
   findWithPagination(
     filter?: FilterQuery<IAgent>,
@@ -32,6 +33,7 @@ export interface IAgentService {
     status?: 'active' | 'inactive' | 'suspended',
     channelId?: string,
     userId?: string,
+    projectId?: string,
   ): Promise<{
     agents: AgentResponseDto[];
     pagination: {
@@ -43,6 +45,7 @@ export interface IAgentService {
   }>;
   getActiveAgents(): Promise<AgentResponseDto[]>;
   getAgentsByChannelId(channelId: string): Promise<AgentResponseDto[]>;
+  getAgentsByProjectId(projectId: string): Promise<AgentResponseDto[]>;
   getAgentsByUserId(userId: string): Promise<AgentResponseDto[]>;
   getAgentHierarchyInfo(
     agentId: string,
@@ -77,5 +80,6 @@ export interface IAgentController {
   getAllAgents(req: Request, res: Response): Promise<void>;
   getActiveAgents(req: Request, res: Response): Promise<void>;
   getAgentsByChannelId(req: Request, res: Response): Promise<void>;
+  getAgentsByProjectId(req: Request, res: Response): Promise<void>;
   getAgentsByUserId(req: Request, res: Response): Promise<void>;
 }

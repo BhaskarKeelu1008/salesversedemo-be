@@ -31,6 +31,26 @@ export class AgentController
     try {
       logger.debug('Create agent request received', req.body);
 
+      // Validate that either agentCode or generateAgentCode is provided
+      const { agentCode, generateAgentCode, projectId } = req.body;
+
+      if (!agentCode && !generateAgentCode) {
+        this.sendBadRequest(
+          res,
+          'Either agentCode or generateAgentCode must be provided',
+        );
+        return;
+      }
+
+      // If generateAgentCode is true, projectId is required
+      if (generateAgentCode && !projectId) {
+        this.sendBadRequest(
+          res,
+          'Project ID is required when generating agent code automatically',
+        );
+        return;
+      }
+
       // req.body is now validated and transformed by ValidationPipe
       const agentData = req.body as CreateAgentDto;
       const agent = await this.agentService.createAgent(agentData);
@@ -163,6 +183,7 @@ export class AgentController
       const status = queryParams.status;
       const channelId = queryParams.channelId;
       const userId = queryParams.userId;
+      const projectId = queryParams.projectId;
 
       const result = await this.agentService.getAllAgents(
         page,
@@ -170,6 +191,7 @@ export class AgentController
         status,
         channelId,
         userId,
+        projectId,
       );
 
       logger.debug('Agents retrieved successfully', {
@@ -261,6 +283,47 @@ export class AgentController
       this.sendError(
         res,
         'Failed to retrieve agents by channel ID',
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        err,
+      );
+    }
+  };
+
+  public getAgentsByProjectId = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const { projectId } = req.params;
+      logger.debug('Get agents by project ID request received', { projectId });
+
+      if (!projectId) {
+        this.sendBadRequest(res, 'Project ID is required');
+        return;
+      }
+
+      const agents = await this.agentService.getAgentsByProjectId(projectId);
+
+      logger.debug('Agents by project ID retrieved successfully', {
+        projectId,
+        count: agents.length,
+      });
+      this.sendSuccess(
+        res,
+        agents,
+        'Agents by project ID retrieved successfully',
+      );
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to get agents by project ID:', {
+        error: err.message,
+        stack: err.stack,
+        projectId: req.params.projectId,
+      });
+
+      this.sendError(
+        res,
+        'Failed to retrieve agents by project ID',
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         err,
       );

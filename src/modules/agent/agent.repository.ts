@@ -20,6 +20,7 @@ export class AgentRepository
         .findOne({ agentCode: code, isDeleted: false })
         .populate('channelId')
         .populate('designationId')
+        .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .exec();
@@ -43,6 +44,7 @@ export class AgentRepository
         .find({ agentStatus: 'active', isDeleted: false })
         .populate('channelId')
         .populate('designationId')
+        .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .sort({ createdAt: -1 })
@@ -66,6 +68,7 @@ export class AgentRepository
         .find({ channelId, isDeleted: false })
         .populate('channelId')
         .populate('designationId')
+        .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .sort({ createdAt: -1 })
@@ -81,6 +84,34 @@ export class AgentRepository
         error: err.message,
         stack: err.stack,
         channelId,
+      });
+      throw error;
+    }
+  }
+
+  public async findAgentsByProjectId(projectId: string): Promise<IAgent[]> {
+    try {
+      logger.debug('Finding agents by project ID', { projectId });
+      const result = await this.model
+        .find({ projectId, isDeleted: false })
+        .populate('channelId')
+        .populate('designationId')
+        .populate('projectId')
+        .populate('teamLeadId')
+        .populate('reportingManagerId')
+        .sort({ createdAt: -1 })
+        .exec();
+      logger.debug('Agents found by project ID', {
+        projectId,
+        count: result.length,
+      });
+      return result;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to find agents by project ID:', {
+        error: err.message,
+        stack: err.stack,
+        projectId,
       });
       throw error;
     }
@@ -107,6 +138,7 @@ export class AgentRepository
           .find(baseFilter)
           .populate('channelId')
           .populate('designationId')
+          .populate('projectId')
           .populate('teamLeadId')
           .populate('reportingManagerId')
           .sort({ createdAt: -1 })
@@ -147,6 +179,7 @@ export class AgentRepository
         .findOne({ _id: id, isDeleted: false })
         .populate('channelId')
         .populate('designationId')
+        .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .exec();
@@ -170,6 +203,7 @@ export class AgentRepository
         .find({ userId, isDeleted: false })
         .populate('channelId')
         .populate('designationId')
+        .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .sort({ createdAt: -1 })
@@ -204,7 +238,7 @@ export class AgentRepository
         designationId: new Types.ObjectId(designationId),
         channelId: new Types.ObjectId(channelId),
         isDeleted: false,
-      }).populate(['channelId', 'designationId']);
+      }).populate(['channelId', 'designationId', 'projectId']);
 
       logger.debug('Found agents by designation and channel', {
         count: agents.length,

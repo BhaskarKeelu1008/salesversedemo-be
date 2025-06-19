@@ -86,7 +86,12 @@ const eventController = new EventController();
  *                   type: string
  *                   format: objectId
  *                 example: ["507f1f77bcf86cd799439013", "507f1f77bcf86cd799439014"]
- *
+ *               eventWith:
+ *                 type: string
+ *                 example: "meeting"
+ *               type:
+ *                 type: string
+ *                 example: "internal"
  *               metadata:
  *                 type: object
  *                 example: {
@@ -152,6 +157,16 @@ router.post(
  *         schema:
  *           type: string
  *         description: Created by of the event
+ *       - in: query
+ *         name: eventWith
+ *         schema:
+ *           type: string
+ *         description: Event with category (e.g., meeting, call)
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: Type of event (e.g., internal, external)
  *     responses:
  *       200:
  *         description: List of events retrieved successfully
@@ -263,7 +278,12 @@ router.get('/:id', async (req, res) => {
  *               status:
  *                 type: string
  *                 enum: [SCHEDULED, CANCELLED, COMPLETED]
- *
+ *               eventWith:
+ *                 type: string
+ *                 example: "meeting"
+ *               type:
+ *                 type: string
+ *                 example: "internal"
  *               metadata:
  *                 type: object
  *     responses:

@@ -20,6 +20,8 @@ export interface CreateEventDto {
   createdBy: Types.ObjectId;
   location: Omit<ILocation, keyof Document>;
   attendees: Types.ObjectId[];
+  eventWith?: string;
+  type?: string;
   metadata?: Record<string, any>;
 }
 
@@ -53,6 +55,14 @@ export class CreateEventValidationDto {
   @IsArray()
   @IsOptional()
   attendees?: Types.ObjectId[];
+
+  @IsString()
+  @IsOptional()
+  eventWith?: string;
+
+  @IsString()
+  @IsOptional()
+  type?: string;
 
   @IsObject()
   @IsOptional()

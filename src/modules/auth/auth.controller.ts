@@ -13,6 +13,8 @@ import { AgentAuthService } from './services/agent-auth.service';
 import type { AgentLoginDto } from './dto/agent-login.dto';
 import { UserModel, type IUser } from '@/models/user.model';
 import type { IAgent } from '@/models/agent.model';
+import { DesignationModel } from '@/models/designation.model';
+import { RoleModel } from '@/models/role.model';
 
 // Define time constants to avoid magic numbers
 const SEVEN_DAYS = 7;
@@ -247,7 +249,6 @@ export class AuthController extends BaseController implements IAuthController {
   public async verifyAgentOTP(req: Request, res: Response): Promise<void> {
     try {
       const { agentCode, otp } = req.body as IVerifyAgentOTPBody;
-
       if (!agentCode || !otp) {
         this.sendBadRequest(res, 'Missing required fields');
         return;
@@ -284,7 +285,33 @@ export class AuthController extends BaseController implements IAuthController {
 
   private async generateTokensForAgent(user: IUser, agent: IAgent) {
     const channelId = this.extractChannelId(agent);
-    return this.authService.generateTokensForUser(user, channelId);
+
+    // Fetch role information from designation and role models
+    let roleId: string | undefined;
+    let roleName: string | undefined;
+
+    try {
+      // Get designation to find roleId
+      const designation = await DesignationModel.findById(agent.designationId);
+      if (designation) {
+        // Get role information using roleId from designation
+        const role = await RoleModel.findById(designation.roleId);
+        if (role) {
+          roleId = role._id.toString();
+          roleName = role.roleName;
+        }
+      }
+    } catch (error) {
+      logger.error('Error fetching role information for agent:', error);
+      // Continue without role information if there's an error
+    }
+
+    return this.authService.generateTokensForUser(
+      user,
+      channelId,
+      roleId,
+      roleName,
+    );
   }
 
   private extractChannelId(agent: IAgent): string | undefined {

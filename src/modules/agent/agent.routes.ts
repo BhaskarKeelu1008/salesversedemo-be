@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { AgentController } from './agent.controller';
 import { ValidationPipe } from '@/common/pipes/validation.pipe';
-import { CreateAgentDto } from '@/modules/agent/dto/create-agent.dto';
-import { AgentQueryDto } from '@/modules/agent/dto/agent-query.dto';
+import { CreateAgentDto } from './dto/create-agent.dto';
+import { AgentQueryDto } from './dto/agent-query.dto';
 
 const router = Router();
 const agentController = new AgentController();
@@ -17,8 +17,6 @@ const agentController = new AgentController();
  *         - userId
  *         - channelId
  *         - designationId
- *         - agentCode
- *         - joiningDate
  *       properties:
  *         userId:
  *           type: string
@@ -35,12 +33,21 @@ const agentController = new AgentController();
  *           format: uuid
  *           description: ID of the agent's designation
  *           example: "507f1f77bcf86cd799439012"
+ *         projectId:
+ *           type: string
+ *           format: uuid
+ *           description: ID of the project the agent belongs to (optional)
+ *           example: "507f1f77bcf86cd799439013"
  *         agentCode:
  *           type: string
  *           maxLength: 10
  *           pattern: "^[A-Z0-9_]+$"
- *           description: Unique agent code (uppercase letters, numbers, and underscores only)
+ *           description: Unique agent code (uppercase letters, numbers, and underscores only). Required if generateAgentCode is not provided.
  *           example: "AGT12345"
+ *         generateAgentCode:
+ *           type: boolean
+ *           description: Flag to automatically generate agent code based on project. Requires projectId to be provided.
+ *           example: true
  *         employeeId:
  *           type: string
  *           description: Employee ID of the agent (optional)
@@ -130,6 +137,18 @@ const agentController = new AgentController();
  *           type: string
  *           description: Code of the designation
  *           example: "SALES_EXEC"
+ *         projectId:
+ *           type: string
+ *           description: ID of the project the agent belongs to
+ *           example: "507f1f77bcf86cd799439044"
+ *         projectName:
+ *           type: string
+ *           description: Name of the project
+ *           example: "Sales Project"
+ *         projectCode:
+ *           type: string
+ *           description: Code of the project
+ *           example: "SALES_PROJ"
  *         agentCode:
  *           type: string
  *           description: Unique agent code
@@ -265,7 +284,7 @@ const agentController = new AgentController();
  *   post:
  *     tags: [Agents]
  *     summary: Create a new agent
- *     description: Creates a new agent with the provided information. Agent code must be unique.
+ *     description: Creates a new agent with the provided information. Either provide an agent code manually or set generateAgentCode to true with a projectId to automatically generate a code.
  *     requestBody:
  *       required: true
  *       content:
@@ -309,7 +328,7 @@ router.post(
  *   get:
  *     tags: [Agents]
  *     summary: Get all agents with pagination
- *     description: Retrieves a paginated list of agents with optional status and channel filtering
+ *     description: Retrieves a paginated list of agents with optional status, channel, user, and project filtering
  *     parameters:
  *       - in: query
  *         name: page
@@ -318,6 +337,7 @@ router.post(
  *           minimum: 1
  *           default: 1
  *         description: Page number for pagination
+ *         example: 1
  *       - in: query
  *         name: limit
  *         schema:
@@ -326,18 +346,32 @@ router.post(
  *           maximum: 100
  *           default: 10
  *         description: Number of items per page
+ *         example: 10
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
  *           enum: [active, inactive, suspended]
  *         description: Filter agents by status
+ *         example: "active"
  *       - in: query
  *         name: channelId
  *         schema:
  *           type: string
  *           format: uuid
  *         description: Filter agents by channel ID
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter agents by user ID
+ *       - in: query
+ *         name: projectId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filter agents by project ID
  *     responses:
  *       200:
  *         description: Agents retrieved successfully
@@ -442,6 +476,50 @@ router.get('/active', agentController.getActiveAgents);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/channel/:channelId', agentController.getAgentsByChannelId);
+
+/**
+ * @swagger
+ * /api/agents/project/{projectId}:
+ *   get:
+ *     tags: [Agents]
+ *     summary: Get agents by project ID
+ *     description: Retrieves a list of agents belonging to a specific project
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID of the project to get agents for
+ *     responses:
+ *       200:
+ *         description: Agents retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/AgentResponse'
+ *       400:
+ *         description: Bad request - invalid project ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/project/:projectId', agentController.getAgentsByProjectId);
 
 /**
  * @swagger

@@ -75,13 +75,15 @@ export class AuthService implements IAuthService {
   public async generateTokensForUser(
     user: IUser,
     channelId?: string,
+    roleId?: string,
+    roleName?: string,
   ): Promise<{
     accessToken: string;
     refreshToken: string;
     projects?: IProject[];
   }> {
     try {
-      const tokens = this.generateTokens(user, channelId);
+      const tokens = this.generateTokens(user, channelId, roleId, roleName);
 
       await UserModel.findByIdAndUpdate(user._id, {
         lastLoginAt: new Date(),
@@ -188,6 +190,8 @@ export class AuthService implements IAuthService {
   private generateTokens(
     user: IUser,
     channelId?: string,
+    roleId?: string,
+    roleName?: string,
   ): {
     accessToken: string;
     refreshToken: string;
@@ -197,6 +201,8 @@ export class AuthService implements IAuthService {
       email: user.email,
       role: user.role,
       ...(channelId && { channelId }),
+      ...(roleId && { roleId }),
+      ...(roleName && { roleName }),
     };
 
     // Handle expiresIn type conversion for JWT sign

@@ -9,10 +9,12 @@ import type {
   IAgentRepository,
 } from '@/modules/agent/interfaces/agent.interface';
 import { Types } from 'mongoose';
-import type { IChannel } from '@/models/channel.model';
-import type { IDesignation } from '@/models/designation.model';
 import { HierarchyService } from '@/modules/hierarchy/hierarchy.service';
 import { DesignationService } from '@/modules/designation/designation.service';
+import {
+  generateAgentCode,
+  isAgentCodeUnique,
+} from './utils/agent-code-generator';
 
 export class AgentService implements IAgentService {
   private agentRepository: IAgentRepository;
@@ -25,8 +27,33 @@ export class AgentService implements IAgentService {
     try {
       logger.debug('Creating agent', { data });
 
-      await this.validateAgentCode(data.agentCode);
-      const agentData = this.prepareAgentData(data);
+      // Handle agent code generation or validation
+      let agentCode: string;
+
+      if (data.generateAgentCode && data.projectId) {
+        // Generate agent code based on project
+        agentCode = await generateAgentCode(data.projectId);
+        logger.debug('Generated agent code', {
+          agentCode,
+          projectId: data.projectId,
+        });
+      } else if (data.agentCode) {
+        // Validate manually provided agent code
+        agentCode = data.agentCode;
+        const isUnique = await isAgentCodeUnique(agentCode);
+
+        if (!isUnique) {
+          throw new DatabaseValidationException(
+            `Agent with code '${agentCode}' already exists`,
+          );
+        }
+      } else {
+        throw new DatabaseValidationException(
+          'Either agent code or generate agent code flag with project ID must be provided',
+        );
+      }
+
+      const agentData = this.prepareAgentData(data, agentCode);
       const agent = await this.saveAgent(agentData);
       return await this.fetchPopulatedAgent(agent._id.toString());
     } catch (error) {
@@ -40,21 +67,18 @@ export class AgentService implements IAgentService {
     }
   }
 
-  private async validateAgentCode(agentCode: string): Promise<void> {
-    const existingAgent = await this.agentRepository.findByCode(agentCode);
-    if (existingAgent) {
-      throw new DatabaseValidationException(
-        `Agent with code '${agentCode}' already exists`,
-      );
-    }
-  }
-
-  private prepareAgentData(data: CreateAgentDto): Partial<IAgent> {
+  private prepareAgentData(
+    data: CreateAgentDto,
+    agentCode: string,
+  ): Partial<IAgent> {
     return {
       userId: new Types.ObjectId(data.userId),
       channelId: new Types.ObjectId(data.channelId),
       designationId: new Types.ObjectId(data.designationId),
-      agentCode: data.agentCode,
+      projectId: data.projectId
+        ? new Types.ObjectId(data.projectId)
+        : undefined,
+      agentCode,
       employeeId: data.employeeId,
       firstName: data.firstName,
       lastName: data.lastName,
@@ -147,6 +171,7 @@ export class AgentService implements IAgentService {
     status?: 'active' | 'inactive' | 'suspended',
     channelId?: string,
     userId?: string,
+    projectId?: string,
   ): Promise<{
     agents: AgentResponseDto[];
     pagination: {
@@ -163,8 +188,14 @@ export class AgentService implements IAgentService {
         status,
         channelId,
         userId,
+        projectId,
       });
-      const filter = this.buildAgentFilter(status, channelId, userId);
+      const filter = this.buildAgentFilter(
+        status,
+        channelId,
+        userId,
+        projectId,
+      );
       const result = await this.fetchAgentsWithPagination(filter, page, limit);
       return this.formatAgentListResponse(result, page, limit);
     } catch (error) {
@@ -177,6 +208,7 @@ export class AgentService implements IAgentService {
         status,
         channelId,
         userId,
+        projectId,
       });
       throw error;
     }
@@ -186,11 +218,13 @@ export class AgentService implements IAgentService {
     status?: 'active' | 'inactive' | 'suspended',
     channelId?: string,
     userId?: string,
+    projectId?: string,
   ): Record<string, unknown> {
     const filter: Record<string, unknown> = {};
     if (status) filter.agentStatus = status;
     if (channelId) filter.channelId = new Types.ObjectId(channelId);
     if (userId) filter.userId = new Types.ObjectId(userId);
+    if (projectId) filter.projectId = new Types.ObjectId(projectId);
     return filter;
   }
 
@@ -268,6 +302,30 @@ export class AgentService implements IAgentService {
     }
   }
 
+  public async getAgentsByProjectId(
+    projectId: string,
+  ): Promise<AgentResponseDto[]> {
+    try {
+      logger.debug('Getting agents by project ID', { projectId });
+      const agents =
+        await this.agentRepository.findAgentsByProjectId(projectId);
+
+      logger.debug('Agents retrieved by project ID successfully', {
+        projectId,
+        count: agents.length,
+      });
+      return agents.map(agent => this.mapToResponseDto(agent));
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to get agents by project ID:', {
+        error: err.message,
+        stack: err.stack,
+        projectId,
+      });
+      throw error;
+    }
+  }
+
   public async getAgentsByUserId(userId: string): Promise<AgentResponseDto[]> {
     try {
       logger.debug('Getting agents by user ID', { userId });
@@ -288,177 +346,6 @@ export class AgentService implements IAgentService {
       });
       throw error;
     }
-  }
-
-  private mapToResponseDto(agent: IAgent): AgentResponseDto {
-    // Process channel data
-    const channelData = this.extractChannelData(agent.channelId);
-
-    // Process designation data
-    const designationData = this.extractDesignationData(agent.designationId);
-
-    // Process team lead data
-    const teamLeadData = this.extractTeamLeadData(agent.teamLeadId);
-
-    // Process reporting manager data
-    const reportingManagerData = this.extractTeamLeadData(
-      agent.reportingManagerId,
-    );
-
-    return {
-      _id: agent._id,
-      channelId: channelData.id,
-      channelName: channelData.name,
-      channelCode: channelData.code,
-      designationId: designationData.id,
-      designationName: designationData.name,
-      designationCode: designationData.code,
-      agentCode: agent.agentCode,
-      employeeId: agent.employeeId,
-      firstName: agent.firstName,
-      middleName: agent.middleName,
-      lastName: agent.lastName,
-      displayName: agent.displayName,
-      fullName:
-        agent.firstName && agent.lastName
-          ? `${agent.firstName} ${agent.middleName ? `${agent.middleName} ` : ''}${agent.lastName}`
-          : undefined,
-      email: agent.email,
-      phoneNumber: agent.phoneNumber,
-      agentStatus: agent.agentStatus,
-      joiningDate: agent.joiningDate,
-      targetAmount: agent.targetAmount,
-      commissionPercentage: agent.commissionPercentage,
-      isTeamLead: agent.isTeamLead,
-      teamLeadId: teamLeadData.id,
-      teamLeadName: teamLeadData.name,
-      teamLeadCode: teamLeadData.code,
-      reportingManagerId: reportingManagerData.id,
-      reportingManagerName: reportingManagerData.name,
-      reportingManagerCode: reportingManagerData.code,
-      profilePictureUrl: agent.profilePictureUrl,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-    };
-  }
-
-  private extractChannelData(channelId: unknown): {
-    id: string | Types.ObjectId;
-    name?: string;
-    code?: string;
-  } {
-    if (!channelId) {
-      return { id: '' };
-    }
-
-    if (channelId instanceof Types.ObjectId) {
-      return { id: channelId };
-    }
-
-    // Handle populated channel object
-    if (typeof channelId === 'object' && channelId !== null) {
-      const channel = channelId as IChannel;
-      if (channel._id) {
-        return {
-          id: channel._id,
-          name: channel.channelName,
-          code: channel.channelCode,
-        };
-      }
-    }
-
-    // Only convert primitive types to string (not objects)
-    if (
-      typeof channelId === 'string' ||
-      typeof channelId === 'number' ||
-      typeof channelId === 'boolean'
-    ) {
-      return { id: String(channelId) };
-    }
-
-    // Fallback for other types
-    return { id: '' };
-  }
-
-  private extractDesignationData(designationId: unknown): {
-    id: string | Types.ObjectId;
-    name?: string;
-    code?: string;
-  } {
-    if (!designationId) {
-      return { id: '' };
-    }
-
-    if (designationId instanceof Types.ObjectId) {
-      return { id: designationId };
-    }
-
-    // Handle populated designation object
-    if (typeof designationId === 'object' && designationId !== null) {
-      const designation = designationId as IDesignation;
-      if (designation._id) {
-        return {
-          id: designation._id,
-          name: designation.designationName,
-          code: designation.designationCode,
-        };
-      }
-    }
-
-    // Only convert primitive types to string (not objects)
-    if (
-      typeof designationId === 'string' ||
-      typeof designationId === 'number' ||
-      typeof designationId === 'boolean'
-    ) {
-      return { id: String(designationId) };
-    }
-
-    // Fallback for other types
-    return { id: '' };
-  }
-
-  private extractTeamLeadData(teamLeadId: unknown): {
-    id?: string | Types.ObjectId;
-    name?: string;
-    code?: string;
-  } {
-    if (!teamLeadId) {
-      return { id: undefined };
-    }
-
-    if (teamLeadId instanceof Types.ObjectId) {
-      return { id: teamLeadId };
-    }
-
-    // Handle populated team lead object
-    if (typeof teamLeadId === 'object' && teamLeadId !== null) {
-      const teamLead = teamLeadId as IAgent;
-      if (teamLead._id) {
-        const fullName =
-          teamLead.firstName && teamLead.lastName
-            ? `${teamLead.firstName} ${teamLead.middleName ? `${teamLead.middleName} ` : ''}${teamLead.lastName}`
-            : undefined;
-
-        return {
-          id: teamLead._id,
-          name: fullName ?? teamLead.displayName,
-          code: teamLead.agentCode,
-        };
-      }
-    }
-
-    // Only convert primitive types to string (not objects)
-    if (
-      typeof teamLeadId === 'string' ||
-      typeof teamLeadId === 'number' ||
-      typeof teamLeadId === 'boolean'
-    ) {
-      return { id: String(teamLeadId) };
-    }
-
-    // Fallback for other types
-    return { id: undefined };
   }
 
   public async getAgentHierarchyInfo(
@@ -600,10 +487,10 @@ export class AgentService implements IAgentService {
         typeof agent.channelId === 'string'
           ? agent.channelId
           : agent.channelId &&
-            typeof agent.channelId === 'object' &&
-            '_id' in agent.channelId
-          ? agent.channelId._id.toString()
-          : '';
+              typeof agent.channelId === 'object' &&
+              '_id' in agent.channelId
+            ? agent.channelId._id.toString()
+            : '';
       const hierarchies =
         await hierarchyService.getHierarchiesByChannel(agentChannelId);
 
@@ -632,25 +519,31 @@ export class AgentService implements IAgentService {
 
       // Get all designations and their agents for each hierarchy
       const designationService = new DesignationService();
-      const hierarchyAgentsMap = new Map<string, typeof filteredHierarchies[0]['agents']>();
+      const hierarchyAgentsMap = new Map<
+        string,
+        (typeof filteredHierarchies)[0]['agents']
+      >();
 
       await Promise.all(
         filteredHierarchies.map(async hierarchy => {
-          const designations = await designationService.getDesignationsByHierarchyId(
-            hierarchy.hierarchyId,
-          );
+          const designations =
+            await designationService.getDesignationsByHierarchyId(
+              hierarchy.hierarchyId,
+            );
 
           const agentPromises = designations.map(async designation => {
-            const agents = await this.agentRepository.findAgentsByDesignationAndChannel(
-              designation._id.toString(),
-              channelId,
-            );
+            const agents =
+              await this.agentRepository.findAgentsByDesignationAndChannel(
+                designation._id.toString(),
+                channelId,
+              );
             return agents
-              .filter(agent => 
-                agent.firstName && 
-                agent.lastName && 
-                !agent.isDeleted && 
-                agent.agentStatus === 'active',
+              .filter(
+                agent =>
+                  agent.firstName &&
+                  agent.lastName &&
+                  !agent.isDeleted &&
+                  agent.agentStatus === 'active',
               )
               .map(agent => ({
                 firstName: agent.firstName!,
@@ -678,7 +571,10 @@ export class AgentService implements IAgentService {
 
       logger.debug('Successfully retrieved agent hierarchy with agents', {
         hierarchiesCount: hierarchiesWithAgents.length,
-        agentsCount: hierarchiesWithAgents.reduce((sum, h) => sum + h.agents.length, 0),
+        agentsCount: hierarchiesWithAgents.reduce(
+          (sum, h) => sum + h.agents.length,
+          0,
+        ),
       });
 
       return {
@@ -694,5 +590,266 @@ export class AgentService implements IAgentService {
       });
       throw error;
     }
+  }
+
+  private mapToResponseDto(agent: IAgent): AgentResponseDto {
+    // Process channel data
+    const channelData = this.extractChannelData(agent.channelId);
+
+    // Process designation data
+    const designationData = this.extractDesignationData(agent.designationId);
+
+    // Process project data
+    const projectData = this.extractProjectData(agent.projectId);
+
+    // Process team lead data
+    const teamLeadData = this.extractTeamLeadData(agent.teamLeadId);
+
+    // Process reporting manager data
+    const reportingManagerData = this.extractTeamLeadData(
+      agent.reportingManagerId,
+    );
+
+    return {
+      _id: agent._id,
+      channelId: channelData.id,
+      channelName: channelData.name,
+      channelCode: channelData.code,
+      designationId: designationData.id,
+      designationName: designationData.name,
+      designationCode: designationData.code,
+      projectId: projectData.id,
+      projectName: projectData.name,
+      projectCode: projectData.code,
+      agentCode: agent.agentCode,
+      employeeId: agent.employeeId,
+      firstName: agent.firstName,
+      middleName: agent.middleName,
+      lastName: agent.lastName,
+      displayName: agent.displayName,
+      fullName:
+        agent.firstName && agent.lastName
+          ? `${agent.firstName} ${agent.middleName ? `${agent.middleName} ` : ''}${agent.lastName}`
+          : undefined,
+      email: agent.email,
+      phoneNumber: agent.phoneNumber,
+      agentStatus: agent.agentStatus,
+      joiningDate: agent.joiningDate,
+      targetAmount: agent.targetAmount,
+      commissionPercentage: agent.commissionPercentage,
+      isTeamLead: agent.isTeamLead,
+      teamLeadId: teamLeadData.id,
+      teamLeadName: teamLeadData.name,
+      teamLeadCode: teamLeadData.code,
+      reportingManagerId: reportingManagerData.id,
+      reportingManagerName: reportingManagerData.name,
+      reportingManagerCode: reportingManagerData.code,
+      profilePictureUrl: agent.profilePictureUrl,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+    };
+  }
+
+  private extractChannelData(channel: unknown): {
+    id: string | Types.ObjectId;
+    name?: string;
+    code?: string;
+  } {
+    if (!channel) return { id: '' };
+
+    if (channel instanceof Types.ObjectId) {
+      return { id: channel };
+    }
+
+    // Handle populated channel object
+    if (typeof channel === 'object' && channel !== null) {
+      const channelObj = channel as Record<string, unknown>;
+      if (channelObj._id) {
+        return {
+          id: this.safeString(channelObj._id),
+          name:
+            typeof channelObj.channelName === 'string'
+              ? channelObj.channelName
+              : undefined,
+          code:
+            typeof channelObj.channelCode === 'string' ||
+            typeof channelObj.channelCode === 'number'
+              ? String(channelObj.channelCode)
+              : undefined,
+        };
+      }
+    }
+
+    // Only convert primitive types to string (not objects)
+    if (
+      typeof channel === 'string' ||
+      typeof channel === 'number' ||
+      typeof channel === 'boolean'
+    ) {
+      return { id: String(channel) };
+    }
+
+    // Fallback for other types
+    return { id: '' };
+  }
+
+  private extractDesignationData(designation: unknown): {
+    id: string | Types.ObjectId;
+    name?: string;
+    code?: string;
+  } {
+    if (!designation) return { id: '' };
+
+    if (designation instanceof Types.ObjectId) {
+      return { id: designation };
+    }
+
+    // Handle populated designation object
+    if (typeof designation === 'object' && designation !== null) {
+      const designationObj = designation as Record<string, unknown>;
+      if (designationObj._id) {
+        return {
+          id: this.safeString(designationObj._id),
+          name:
+            typeof designationObj.designationName === 'string'
+              ? designationObj.designationName
+              : undefined,
+          code:
+            typeof designationObj.designationCode === 'string' ||
+            typeof designationObj.designationCode === 'number'
+              ? String(designationObj.designationCode)
+              : undefined,
+        };
+      }
+    }
+
+    // Only convert primitive types to string (not objects)
+    if (
+      typeof designation === 'string' ||
+      typeof designation === 'number' ||
+      typeof designation === 'boolean'
+    ) {
+      return { id: String(designation) };
+    }
+
+    // Fallback for other types
+    return { id: '' };
+  }
+
+  private extractProjectData(project: unknown): {
+    id?: string | Types.ObjectId;
+    name?: string;
+    code?: string;
+  } {
+    if (!project) return { id: undefined };
+
+    if (project instanceof Types.ObjectId) {
+      return { id: project };
+    }
+
+    // Handle populated project object
+    if (typeof project === 'object' && project !== null) {
+      const projectObj = project as Record<string, unknown>;
+      if (projectObj._id) {
+        return {
+          id: this.safeString(projectObj._id),
+          name:
+            typeof projectObj.projectName === 'string'
+              ? projectObj.projectName
+              : undefined,
+          code:
+            typeof projectObj.projectCode === 'string' ||
+            typeof projectObj.projectCode === 'number'
+              ? String(projectObj.projectCode)
+              : undefined,
+        };
+      }
+    }
+
+    // Only convert primitive types to string (not objects)
+    if (
+      typeof project === 'string' ||
+      typeof project === 'number' ||
+      typeof project === 'boolean'
+    ) {
+      return { id: String(project) };
+    }
+
+    // Fallback for other types
+    return { id: undefined };
+  }
+
+  private extractTeamLeadData(teamLead: unknown): {
+    id?: string | Types.ObjectId;
+    name?: string;
+    code?: string;
+  } {
+    if (!teamLead) return { id: undefined };
+
+    if (teamLead instanceof Types.ObjectId) {
+      return { id: teamLead };
+    }
+
+    // Handle populated team lead object
+    if (typeof teamLead === 'object' && teamLead !== null) {
+      const teamLeadObj = teamLead as Record<string, unknown>;
+      if (teamLeadObj._id) {
+        const fullName =
+          typeof teamLeadObj.firstName === 'string' &&
+          typeof teamLeadObj.lastName === 'string'
+            ? `${teamLeadObj.firstName} ${
+                typeof teamLeadObj.middleName === 'string'
+                  ? `${teamLeadObj.middleName} `
+                  : ''
+              }${teamLeadObj.lastName}`
+            : undefined;
+
+        return {
+          id: this.safeString(teamLeadObj._id),
+          name:
+            fullName ??
+            (typeof teamLeadObj.displayName === 'string'
+              ? teamLeadObj.displayName
+              : undefined),
+          code:
+            typeof teamLeadObj.agentCode === 'string'
+              ? teamLeadObj.agentCode
+              : undefined,
+        };
+      }
+    }
+
+    // Only convert primitive types to string (not objects)
+    if (
+      typeof teamLead === 'string' ||
+      typeof teamLead === 'number' ||
+      typeof teamLead === 'boolean'
+    ) {
+      return { id: String(teamLead) };
+    }
+
+    // Fallback for other types
+    return { id: undefined };
+  }
+
+  private safeString(value: unknown): string {
+    if (value === null || value === undefined) return '';
+
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean')
+      return String(value);
+
+    if (value instanceof Types.ObjectId) return value.toString();
+
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toString' in value &&
+      typeof (value as { toString(): string }).toString === 'function'
+    ) {
+      return (value as { toString(): string }).toString();
+    }
+
+    return '';
   }
 }

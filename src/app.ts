@@ -33,6 +33,9 @@ import productRoutes from '@/modules/product/product.routes';
 import utilityRoutes from '@/modules/utility/utility.routes';
 import projectRoutes from '@/modules/project/project.routes';
 import moduleRoutes from '@/modules/module/module.routes';
+import resourceCenterRoutes from '@/modules/resourceCenter/resource-center.routes';
+import moduleConfigRoutes from '@/modules/module-config/module-config.routes';
+import resourceCenterMasterRoutes from '@/modules/resourceMaster/resource-center-master.routes';
 import cookieParser from 'cookie-parser';
 
 // Session constants
@@ -147,6 +150,9 @@ export class App {
     this.app.use('/api/utility', utilityRoutes);
     this.app.use('/api/projects', projectRoutes);
     this.app.use('/api/modules', moduleRoutes);
+    this.app.use('/api/resourceCenter', resourceCenterRoutes);
+    this.app.use('/api/module-configs', moduleConfigRoutes);
+    this.app.use('/api/resource-center-master', resourceCenterMasterRoutes);
 
     this.app.use('/health/database', (req: Request, res: Response) => {
       const health = this.databaseProvider.getHealth();

@@ -5,6 +5,7 @@ import type { IBaseModel } from '@/models/base.model';
 import type { IChannel } from '@/models/channel.model';
 import type { IDesignation } from '@/models/designation.model';
 import type { IUser } from '@/models/user.model';
+import type { IProject } from '@/models/project.model';
 
 const MAX_SKILLS_LENGTH = 50;
 const MAX_LANGUAGES_LENGTH = 30;
@@ -227,6 +228,7 @@ export interface IAgent extends IBaseModel {
   userId: Types.ObjectId | IUser;
   channelId: Types.ObjectId | IChannel;
   designationId: Types.ObjectId | IDesignation;
+  projectId?: Types.ObjectId | IProject;
   agentCode: string;
   employeeId?: string;
   title?: (typeof TITLE_TYPES)[number];
@@ -346,6 +348,10 @@ const agentSchema = new Schema<IAgent>(
       type: Schema.Types.ObjectId,
       ref: 'Designation',
       required: [true, 'Designation ID is required'],
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
     },
     agentCode: {
       type: String,
@@ -1419,6 +1425,8 @@ agentSchema.index({ designationId: 1, agentStatus: 1 });
 agentSchema.index({ teamLeadId: 1, agentStatus: 1 });
 agentSchema.index({ reportingManagerId: 1, agentStatus: 1 });
 agentSchema.index({ userId: 1, isDeleted: 1 });
+agentSchema.index({ projectId: 1, isDeleted: 1 });
+agentSchema.index({ projectId: 1, agentStatus: 1 });
 
 agentSchema.index({ email: 1 }, { sparse: true });
 agentSchema.index({ phoneNumber: 1 }, { sparse: true });

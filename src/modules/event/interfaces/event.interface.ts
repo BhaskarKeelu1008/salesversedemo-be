@@ -14,6 +14,8 @@ export interface IEventFilter {
   startDateTime?: string | Date;
   endDateTime?: string | Date;
   createdBy?: string;
+  eventWith?: string;
+  type?: string;
   page?: number;
   limit?: number;
 }

@@ -85,8 +85,7 @@ export class EventService {
 
       const savedEvent = await this.eventRepository.createEvent(event);
 
-      return savedEvent.populate(['location']);
-      // return savedEvent.populate(['location', 'createdBy', 'attendees']);
+      return savedEvent.populate(['location', 'attendees']);
     } catch (error) {
       logger.error('Error creating event', { error });
       throw error;
@@ -119,11 +118,20 @@ export class EventService {
   }
 
   private buildEventQuery(filter: IEventFilter): Record<string, unknown> {
-    const { status, startDateTime, endDateTime, createdBy } = filter;
+    const { status, startDateTime, endDateTime, createdBy, eventWith, type } =
+      filter;
     const query: Record<string, unknown> = {};
 
     if (status) {
       query.status = status;
+    }
+
+    if (eventWith) {
+      query.eventWith = eventWith;
+    }
+
+    if (type) {
+      query.type = type;
     }
 
     this.addDateRangeToQuery(query, startDateTime, endDateTime);
@@ -195,7 +203,7 @@ export class EventService {
       if (!event) {
         throw new NotFoundException('Event not found');
       }
-      return event.populate(['location']);
+      return event.populate(['location', 'attendees']);
     } catch (error) {
       logger.error('Error fetching event by ID', { error, id });
       throw error;
