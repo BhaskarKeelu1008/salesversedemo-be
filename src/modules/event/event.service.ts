@@ -234,13 +234,43 @@ export class EventService {
         }
       }
 
-      const event = await this.eventRepository.updateEvent(id, updateData);
+      // Handle location update
+      const { location, attendees, ...restUpdateData } = updateData;
+      const eventUpdate: Record<string, unknown> = { ...restUpdateData };
+
+      // Handle location based on its format
+      if (location) {
+        // If location has _id, use it as the location reference
+        if (
+          typeof location === 'object' &&
+          '_id' in location &&
+          Types.ObjectId.isValid(location._id as string)
+        ) {
+          eventUpdate.location = new Types.ObjectId(location._id as string);
+        }
+        // If location is a string (ObjectId), use it directly
+        else if (
+          typeof location === 'string' &&
+          Types.ObjectId.isValid(location)
+        ) {
+          eventUpdate.location = new Types.ObjectId(location);
+        }
+      }
+
+      // Convert attendee IDs to ObjectIds if provided
+      if (attendees?.length) {
+        eventUpdate.attendees = attendees.map(
+          attendeeId => new Types.ObjectId(attendeeId),
+        );
+      }
+
+      const event = await this.eventRepository.updateEvent(id, eventUpdate);
 
       if (!event) {
         throw new NotFoundException('Event not found');
       }
 
-      return event;
+      return event.populate(['location', 'attendees']);
     } catch (error) {
       logger.error('Error updating event', { error, id, updateData });
       throw error;

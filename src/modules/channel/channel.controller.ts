@@ -167,11 +167,13 @@ export class ChannelController
         ? parseInt(queryParams.limit, 10)
         : PAGINATION.DEFAULT_LIMIT;
       const status = queryParams.status;
+      const projectId = queryParams.projectId;
 
       const result = await this.channelService.getAllChannels(
         page,
         limit,
         status,
+        projectId,
       );
 
       logger.debug('Channels retrieved successfully', {

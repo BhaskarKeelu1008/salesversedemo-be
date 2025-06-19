@@ -39,6 +39,7 @@ export interface IAobApplication {
   rejectRemark?: string;
   applicationId?: string;
   documentId?: string;
+  projectId?: Types.ObjectId;
   qcAndDiscrepencyList?: IQcAndDiscrepancyList[];
   createdAt: Date;
   updatedAt: Date;
@@ -175,6 +176,10 @@ const AobApplicationSchema = new Schema<IAobApplication>(
       unique: true,
       default: () => uuidv4(),
     },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+    },
     qcAndDiscrepencyList: [QcAndDiscrepancyListSchema],
   },
   {
@@ -188,6 +193,7 @@ AobApplicationSchema.index({ emailAddress: 1 });
 AobApplicationSchema.index({ mobileNumber: 1 });
 AobApplicationSchema.index({ applicationStatus: 1 });
 AobApplicationSchema.index({ createdAt: -1 });
+AobApplicationSchema.index({ projectId: 1 });
 
 export const AobApplicationModel = model<IAobApplication>(
   'AobApplication',

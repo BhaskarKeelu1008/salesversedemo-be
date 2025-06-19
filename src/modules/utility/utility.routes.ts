@@ -5,6 +5,7 @@ import { ValidationPipe } from '@/common/pipes/validation.pipe';
 import { GetAgentHierarchyDto } from '@/modules/agent/dto/get-agent-hierarchy.dto';
 import { GetAgentHierarchyInfoDto } from '@/modules/agent/dto/get-agent-hierarchy-info.dto';
 import { UtilityController } from './utility.controller';
+import { EmailVerificationDto } from './dto/email-verification.dto';
 
 const router = Router();
 const utilityController = new UtilityController();
@@ -132,8 +133,92 @@ router.get(
   ValidationPipe.validateQuery(GetAgentHierarchyInfoDto),
   (req: Request, res: Response, next: NextFunction) =>
     utilityController
-      .getAgentHierarchyWithAgents(req as ValidatedRequest<GetAgentHierarchyInfoDto>, res)
+      .getAgentHierarchyWithAgents(
+        req as ValidatedRequest<GetAgentHierarchyInfoDto>,
+        res,
+      )
       .catch(next),
+);
+
+/**
+ * @swagger
+ * /api/utility/email-verification:
+ *   post:
+ *     summary: Verify email address and optionally send/verify OTP
+ *     description: |
+ *       This endpoint serves two purposes:
+ *       1. Validates if an email is already registered in the system
+ *       2. Sends an OTP to the email if it's not registered
+ *       3. Verifies the OTP if one is provided in the request
+ *     tags: [Utility]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailId
+ *             properties:
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address to verify
+ *                 example: "john.doe@example.com"
+ *               otp:
+ *                 type: string
+ *                 description: OTP code to verify (optional)
+ *                 example: "3003"
+ *     responses:
+ *       200:
+ *         description: Email verification response
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "OTP sent to john.doe@example.com"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     exists:
+ *                       type: boolean
+ *                       description: Whether the email is already registered
+ *                       example: false
+ *                     otpSent:
+ *                       type: boolean
+ *                       description: Whether an OTP was sent (only if email doesn't exist)
+ *                       example: true
+ *                     verified:
+ *                       type: boolean
+ *                       description: Whether the OTP was verified successfully (only if OTP was provided)
+ *                       example: true
+ *       400:
+ *         description: Bad request - invalid email format or OTP
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Valid email address is required"
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  '/email-verification',
+  ValidationPipe.validateBody(EmailVerificationDto),
+  (req: Request, res: Response, next: NextFunction) =>
+    utilityController.verifyEmail(req, res).catch(next),
 );
 
 export default router;

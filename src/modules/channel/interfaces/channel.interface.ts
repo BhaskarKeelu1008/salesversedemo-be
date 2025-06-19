@@ -26,6 +26,7 @@ export interface IChannelService {
     page?: number,
     limit?: number,
     status?: 'active' | 'inactive',
+    projectId?: string,
   ): Promise<{
     channels: ChannelResponseDto[];
     pagination: {

@@ -7,8 +7,13 @@ import {
   patchApplication,
   uploadDocument,
   getQcHistoryList,
+  batchUpdateDocumentStatus,
 } from './aob.controller';
 import multer from 'multer';
+import { ValidationPipe } from '@/common/pipes/validation.pipe';
+import { BatchUpdateDocumentStatusDto } from './dto/batch-update-document-status.dto';
+import { DocumentDetailsQueryDto } from './dto/document-details.dto';
+import { QcDiscrepancyUpdateDto } from './dto/qc-discrepancy-update.dto';
 
 const router = Router();
 const aobController = new AobController();
@@ -179,6 +184,10 @@ const upload = multer({
  *         rejectRemark:
  *           type: string
  *           example: ""
+ *         projectId:
+ *           type: string
+ *           description: Reference to the project
+ *           example: "507f1f77bcf86cd799439011"
  *         qcAndDiscrepencyList:
  *           type: array
  *           items:
@@ -221,6 +230,10 @@ const upload = multer({
  *         remarks:
  *           type: string
  *           example: "Application is being reviewed"
+ *         projectId:
+ *           type: string
+ *           description: Reference to the project
+ *           example: "507f1f77bcf86cd799439011"
  *     DocumentUploadRequest:
  *       type: object
  *       required:
@@ -247,6 +260,10 @@ const upload = multer({
  *           type: string
  *           enum: [approve, reject, documentSubmitted]
  *           example: "approve"
+ *         projectId:
+ *           type: string
+ *           description: Reference to the project
+ *           example: "507f1f77bcf86cd799439011"
  *     QcHistoryResponse:
  *       type: object
  *       properties:
@@ -394,78 +411,363 @@ const upload = multer({
  *         message:
  *           type: string
  *           example: "Email is verified"
+ *         applicationStatus:
+ *           type: string
+ *           enum: [applicationSubmitted, underReview, rejected, approved, returned]
+ *           example: "approved"
+ *         rejectionReason:
+ *           type: string
+ *           example: "Missing required documents"
+ *     BatchUpdateDocumentStatusRequest:
+ *       type: object
+ *       required:
+ *         - applicationId
+ *         - documents
+ *       properties:
+ *         applicationId:
+ *           type: string
+ *           description: The application ID
+ *           example: "APP17500051476209013"
+ *         projectId:
+ *           type: string
+ *           description: Reference to the project (optional)
+ *           example: "507f1f77bcf86cd799439011"
+ *         documents:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required:
+ *               - documentId
+ *               - documentStatus
+ *             properties:
+ *               documentId:
+ *                 type: string
+ *                 description: The document ID
+ *                 example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *               documentStatus:
+ *                 type: string
+ *                 enum: [approve, reject, documentSubmitted]
+ *                 description: The new status for the document
+ *                 example: "approve"
+ *               remarks:
+ *                 type: string
+ *                 description: Optional remarks (required for reject status)
+ *                 example: "Document is not clear"
+ *     BatchUpdateDocumentStatusResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "Documents status updated successfully"
+ *         data:
+ *           type: object
+ *           properties:
+ *             success:
+ *               type: boolean
+ *               example: true
+ *             results:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   documentId:
+ *                     type: string
+ *                     example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *                   success:
+ *                     type: boolean
+ *                     example: true
+ *                   status:
+ *                     type: string
+ *                     example: "approve"
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-06-17T09:15:54.964Z"
+ *     DocumentDetailsResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "Document details retrieved successfully"
+ *         data:
+ *           type: object
+ *           properties:
+ *             document:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                   example: "684fdde5da58a898bc52141d"
+ *                 presignedS3Url:
+ *                   type: string
+ *                   example: "https://salesverse-inxt-public-documents-20250531.s3.ap-southeast-1.amazonaws.com/81b8b867-2286-4404-a30c-87e1443edee5.jpg"
+ *                 documentId:
+ *                   type: string
+ *                   example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *                 applicationId:
+ *                   type: string
+ *                   example: "APP17500051476209013"
+ *                 documentStatus:
+ *                   type: string
+ *                   enum: [approve, reject, documentSubmitted]
+ *                   example: "reject"
+ *                 documentType:
+ *                   type: string
+ *                   example: "sssDocument"
+ *                 documentFormat:
+ *                   type: string
+ *                   enum: [pdf, png, jpg]
+ *                   example: "jpg"
+ *                 documentName:
+ *                   type: string
+ *                   example: "4047.jpg"
+ *                 s3Key:
+ *                   type: string
+ *                   example: "81b8b867-2286-4404-a30c-87e1443edee5.jpg"
+ *             history:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   _id:
+ *                     type: string
+ *                   documentId:
+ *                     type: string
+ *                   documentStatus:
+ *                     type: string
+ *                   createdAt:
+ *                     type: string
+ *                     format: date-time
+ *             discrepancy:
+ *               type: object
+ *               nullable: true
+ *               properties:
+ *                 documentType:
+ *                   type: string
+ *                 documentName:
+ *                   type: string
+ *                 remarks:
+ *                   type: string
+ *             application:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                 applicationId:
+ *                   type: string
+ *                 firstName:
+ *                   type: string
+ *                 lastName:
+ *                   type: string
+ *                 emailAddress:
+ *                   type: string
+ *                 mobileNumber:
+ *                   type: string
+ *                 applicationStatus:
+ *                   type: string
+ *                 projectId:
+ *                   type: string
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *     QcDiscrepancyUpdateRequest:
+ *       type: object
+ *       required:
+ *         - applicationId
+ *         - documents
+ *       properties:
+ *         applicationId:
+ *           type: string
+ *           description: The application ID
+ *           example: "APP17500051476209013"
+ *         projectId:
+ *           type: string
+ *           description: Reference to the project (optional)
+ *           example: "507f1f77bcf86cd799439011"
+ *         documents:
+ *           type: array
+ *           items:
+ *             type: object
+ *             required:
+ *               - documentId
+ *               - documentType
+ *               - documentName
+ *               - status
+ *             properties:
+ *               documentId:
+ *                 type: string
+ *                 description: The document ID
+ *                 example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *               documentType:
+ *                 type: string
+ *                 description: Type of the document
+ *                 example: "examResult"
+ *               documentName:
+ *                 type: string
+ *                 description: Name of the document
+ *                 example: "Life Insurance Exam Result"
+ *               status:
+ *                 type: string
+ *                 enum: [approve, reject]
+ *                 description: The status to set for the document
+ *                 example: "approve"
+ *               remarks:
+ *                 type: string
+ *                 description: Remarks for the document (required for reject status)
+ *                 example: "Document is not clear"
+ *         updateApplicationStatus:
+ *           type: boolean
+ *           description: Whether to automatically update the application status based on document statuses
+ *           example: true
+ *     QcDiscrepancyUpdateResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "QC discrepancies updated successfully"
+ *         data:
+ *           type: object
+ *           properties:
+ *             applicationId:
+ *               type: string
+ *               example: "APP17500051476209013"
+ *             applicationStatus:
+ *               type: string
+ *               example: "approved"
+ *             updatedDocuments:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   documentId:
+ *                     type: string
+ *                     example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *                   status:
+ *                     type: string
+ *                     example: "approve"
+ *                   remarks:
+ *                     type: string
+ *                     example: "Document verified successfully"
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-06-19T14:23:29.221Z"
  */
 
 /**
  * @swagger
- * /api/aobDocumentMaster:
+ * /api/aob/document/batch:
  *   post:
- *     summary: Create bulk AOB document masters
- *     description: Create multiple AOB document master entries at once. Supports both direct array format and wrapped object format.
+ *     summary: Batch update document statuses
  *     tags: [AOB]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             oneOf:
- *               - type: array
- *                 items:
- *                   $ref: '#/components/schemas/CreateAobDocumentMasterDto'
- *                 description: Direct array of document masters
- *               - $ref: '#/components/schemas/BulkCreateAobDocumentMasterDto'
- *                 description: Object with documents array property
- *           examples:
- *             directArray:
- *               summary: Direct Array Format
- *               value:
- *                 - documentName: "Examination Result (IC Or IIAP) (1 Page)"
- *                   documentType: "examResult"
- *                   documentDescription: "Examination result from Insurance Commission or IIAP"
- *                   documentInstruction: "Maximum 5 MB. PDF, PNG or JPG files"
- *                   category: ""
- *                 - documentName: "Accomplished IC Application (4 Pages)"
- *                   documentType: "icApplicationForm"
- *                   documentDescription: "IC application form for agent registration"
- *                   documentInstruction: "Download form here\\nMaximum 5 MB. PDF file only"
- *                   category: ""
- *             wrappedObject:
- *               summary: Wrapped Object Format
- *               value:
- *                 documents:
- *                   - documentName: "Examination Result (IC Or IIAP) (1 Page)"
- *                     documentType: "examResult"
- *                     documentDescription: "Examination result from Insurance Commission or IIAP"
- *                     documentInstruction: "Maximum 5 MB. PDF, PNG or JPG files"
- *                     category: ""
- *                   - documentName: "Accomplished IC Application (4 Pages)"
- *                     documentType: "icApplicationForm"
- *                     documentDescription: "IC application form for agent registration"
- *                     documentInstruction: "Download form here\\nMaximum 5 MB. PDF file only"
- *                     category: ""
+ *             $ref: '#/components/schemas/BatchUpdateDocumentStatusRequest'
  *     responses:
- *       201:
- *         description: Document masters created successfully
+ *       200:
+ *         description: Documents status updated successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Successfully created 12 document masters"
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/AobDocumentMasterResponseDto'
+ *               $ref: '#/components/schemas/BatchUpdateDocumentStatusResponse'
  *       400:
- *         description: Bad request - validation error or invalid format
+ *         description: Bad request - missing required fields or invalid data
+ *       404:
+ *         description: Application not found
  *       500:
  *         description: Internal server error
  */
+router.post(
+  '/document/batch',
+  ValidationPipe.validateBody(BatchUpdateDocumentStatusDto),
+  batchUpdateDocumentStatus,
+);
+
+/**
+ * @swagger
+ * /api/aob/document/details:
+ *   get:
+ *     summary: Get document details by application ID and document ID
+ *     tags: [AOB]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The application ID
+ *         example: "APP17500051476209013"
+ *       - in: query
+ *         name: documentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The document ID
+ *         example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *     responses:
+ *       200:
+ *         description: Document details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DocumentDetailsResponse'
+ *       400:
+ *         description: Bad request - missing required parameters
+ *       404:
+ *         description: Application or document not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  '/document/details',
+  ValidationPipe.validateQuery(DocumentDetailsQueryDto),
+  (req, res) => aobController.getDocumentDetails(req, res),
+);
+
+/**
+ * @swagger
+ * /api/aob/application/qcHistoryList:
+ *   get:
+ *     summary: Get QC history list for a document
+ *     tags: [AOB]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: documentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved QC history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/QcHistoryResponse'
+ *       400:
+ *         description: Bad request - Document ID is required
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/application/qcHistoryList', getQcHistoryList);
 
 // Application routes
 /**
@@ -503,33 +805,15 @@ const upload = multer({
  *           type: string
  *         description: Search in firstName, lastName, emailAddress, or mobileNumber
  *         example: "john"
+ *       - in: query
+ *         name: projectId
+ *         schema:
+ *           type: string
+ *         description: Filter by project ID
+ *         example: "507f1f77bcf86cd799439011"
  *     responses:
  *       200:
  *         description: List of applications retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/AobApplication'
- *                 total:
- *                   type: integer
- *                   description: Total number of applications
- *                   example: 150
- *                 skip:
- *                   type: integer
- *                   description: Number of items skipped
- *                   example: 0
- *                 limit:
- *                   type: integer
- *                   description: Number of items returned
- *                   example: 10
  *       500:
  *         description: Internal server error
  */
@@ -648,60 +932,6 @@ router.patch('/application/:applicationId', patchApplication);
  *         description: Server error
  */
 router.patch('/document', upload.single('file'), uploadDocument);
-
-/**
- * @swagger
- * /api/aob/application/qcHistoryList:
- *   get:
- *     summary: Get QC history list for a document
- *     tags: [AOB]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: documentId
- *         required: true
- *         schema:
- *           type: string
- *         example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
- *     responses:
- *       200:
- *         description: Successfully retrieved QC history
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/QcHistoryResponse'
- *       400:
- *         description: Bad request - Document ID is required
- *       500:
- *         description: Internal server error
- */
-router.get('/application/qcHistoryList', getQcHistoryList);
-
-/**
- * @swagger
- * /api/aob:
- *   get:
- *     summary: Get all AOB document masters
- *     tags: [AOB]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of document masters retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/DocumentMasterResponse'
- *       500:
- *         description: Internal server error
- */
-router.get('/', (req, res) => {
-  if (req.query.category) {
-    return aobController.getDocumentMastersByCategory(req, res);
-  }
-  return aobController.getAllDocumentMasters(req, res);
-});
 
 /**
  * @swagger
@@ -913,5 +1143,44 @@ router.get('/getApplication', (req, res, next) =>
  *         description: Internal server error
  */
 router.get('/:id', (req, res) => aobController.getDocumentMasterById(req, res));
+
+/**
+ * @swagger
+ * /api/aob/document/qc-update:
+ *   post:
+ *     summary: Update QC discrepancies and document statuses
+ *     description: |
+ *       Updates document statuses and QC discrepancies for an application.
+ *       Can optionally update the application status based on document statuses.
+ *       - If all documents are approved, application status can be set to 'approved'
+ *       - If any document is rejected, application status can be set to 'returned'
+ *     tags: [AOB]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/QcDiscrepancyUpdateRequest'
+ *     responses:
+ *       200:
+ *         description: QC discrepancies updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/QcDiscrepancyUpdateResponse'
+ *       400:
+ *         description: Bad request - missing required fields or invalid data
+ *       404:
+ *         description: Application or document not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  '/document/qc-update',
+  ValidationPipe.validateBody(QcDiscrepancyUpdateDto),
+  (req, res) => aobController.updateQcDiscrepancies(req, res),
+);
 
 export default router;

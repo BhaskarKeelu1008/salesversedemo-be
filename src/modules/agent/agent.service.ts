@@ -15,12 +15,20 @@ import {
   generateAgentCode,
   isAgentCodeUnique,
 } from './utils/agent-code-generator';
+import { HierarchyRepository } from '@/modules/hierarchy/hierarchy.repository';
+import { DatabaseException } from '@/common/exceptions/database.exception';
 
 export class AgentService implements IAgentService {
   private agentRepository: IAgentRepository;
+  private hierarchyRepository: HierarchyRepository;
+  private hierarchyService: HierarchyService;
+  private designationService: DesignationService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
+    this.hierarchyRepository = new HierarchyRepository();
+    this.hierarchyService = new HierarchyService();
+    this.designationService = new DesignationService();
   }
 
   public async createAgent(data: CreateAgentDto): Promise<AgentResponseDto> {
@@ -350,8 +358,8 @@ export class AgentService implements IAgentService {
 
   public async getAgentHierarchyInfo(
     agentId: string,
-    hierarchyId?: string,
-    channelId?: string,
+    requestedHierarchyId?: string,
+    requestedChannelId?: string,
   ): Promise<{
     hierarchies?: { hierarchyName: string; hierarchyId: string }[];
     agents?: { firstName: string; lastName: string; id: string }[];
@@ -359,50 +367,152 @@ export class AgentService implements IAgentService {
     try {
       logger.debug('Getting agent hierarchy info', {
         agentId,
-        hierarchyId,
-        channelId,
+        hierarchyId: requestedHierarchyId,
+        channelId: requestedChannelId,
       });
 
-      // Get agent's designation
+      // Get agent details with designation
       const agent = await this.agentRepository.findById(agentId);
       if (!agent) {
         throw new Error('Agent not found');
       }
 
-      // Get hierarchy information
-      const hierarchyService = new HierarchyService();
+      // Get agent's designation and hierarchy level
+      const designationId = agent.designationId;
+      if (!designationId) {
+        throw new Error('Agent has no designation');
+      }
+
+      logger.debug('Converting designation ID', {
+        originalDesignationId: designationId,
+        isString: typeof designationId === 'string',
+        isObjectId: designationId instanceof Types.ObjectId,
+        isPopulatedDocument:
+          typeof designationId === 'object' && '_id' in designationId,
+        designationIdType: typeof designationId,
+        designationIdValue: JSON.stringify(designationId),
+      });
+
+      // Validate and convert designationId to string
+      let designationIdString: string | null = null;
+
+      if (typeof designationId === 'string') {
+        // If it's a string, validate it's a valid ObjectId string
+        designationIdString = Types.ObjectId.isValid(designationId)
+          ? designationId
+          : null;
+      } else if (designationId instanceof Types.ObjectId) {
+        designationIdString = designationId.toString();
+      } else if (typeof designationId === 'object' && designationId !== null) {
+        // Handle populated document
+        if ('_id' in designationId && designationId._id) {
+          const docId = designationId._id;
+          // Check if it's an ObjectId using isValid
+          if (Types.ObjectId.isValid(docId)) {
+            designationIdString = docId.toString();
+          }
+        }
+      }
+
+      if (!designationIdString) {
+        logger.error(
+          'Failed to convert designation ID to valid ObjectId string',
+          {
+            originalDesignationId: designationId,
+            type: typeof designationId,
+            value: JSON.stringify(designationId),
+          },
+        );
+        throw new Error(
+          'Invalid designation ID format - must be a valid MongoDB ObjectId',
+        );
+      }
+
+      logger.debug('Successfully converted designation ID', {
+        originalDesignationId: designationId,
+        convertedDesignationId: designationIdString,
+      });
+
+      const designation =
+        await this.designationService.getDesignationById(designationIdString);
+
+      if (!designation) {
+        throw new Error('Agent designation not found');
+      }
+
+      // Get hierarchy from designation
+      let agentHierarchyId: string;
+      const hierarchy = designation.hierarchy;
+
+      if (typeof hierarchy === 'string') {
+        agentHierarchyId = hierarchy;
+      } else if (hierarchy instanceof Types.ObjectId) {
+        agentHierarchyId = hierarchy.toString();
+      } else if (
+        typeof hierarchy === 'object' &&
+        hierarchy &&
+        '_id' in hierarchy
+      ) {
+        agentHierarchyId = hierarchy._id.toString();
+      } else {
+        throw new Error('Invalid hierarchy ID in designation');
+      }
+
+      const hierarchyDetails =
+        await this.hierarchyService.getHierarchyById(agentHierarchyId);
+      if (!hierarchyDetails) {
+        throw new Error('Hierarchy not found');
+      }
+
+      const agentHierarchyLevel = hierarchyDetails.hierarchyLevelCode;
+
+      // Get all hierarchies for the channel
       const agentChannelId =
         typeof agent.channelId === 'string'
           ? agent.channelId
-          : agent.channelId &&
-              typeof agent.channelId === 'object' &&
-              '_id' in agent.channelId
-            ? agent.channelId._id.toString()
-            : '';
-      const hierarchies =
-        await hierarchyService.getHierarchiesByChannel(agentChannelId);
+          : agent.channelId instanceof Types.ObjectId
+            ? agent.channelId.toString()
+            : '_id' in agent.channelId
+              ? agent.channelId._id.toString()
+              : null;
 
-      // Find hierarchy with level code 18
+      if (!agentChannelId || !Types.ObjectId.isValid(agentChannelId)) {
+        logger.error('Invalid channel ID format', {
+          channelId: agent.channelId,
+          agentId,
+        });
+        throw new DatabaseException(
+          'Invalid channel ID format',
+          'INVALID_CHANNEL_ID',
+          400,
+        );
+      }
+
+      const hierarchies =
+        await this.hierarchyService.getHierarchiesByChannel(agentChannelId);
+
+      // Find the target hierarchy based on agent's hierarchy level
       const targetHierarchy = hierarchies.find(
-        h => h.hierarchyLevelCode === '18',
+        h => h.hierarchyLevelCode === agentHierarchyLevel,
       );
       if (!targetHierarchy) {
-        throw new Error('Target hierarchy level 18 not found');
+        throw new Error(
+          `Target hierarchy level ${agentHierarchyLevel} not found`,
+        );
       }
 
       // If only agentId is provided, return hierarchies
-      if (!hierarchyId || !channelId) {
-        // Get hierarchies with level less than 18
+      if (!requestedHierarchyId || !requestedChannelId) {
+        // Get hierarchies with level less than agent's level
         const filteredHierarchies = hierarchies
-          .filter(h => Number(h.hierarchyLevelCode) < 18)
+          .filter(
+            h => Number(h.hierarchyLevelCode) < Number(agentHierarchyLevel),
+          )
+          .sort((a, b) => a.hierarchyLevel - b.hierarchyLevel)
           .map(h => ({
             hierarchyName: h.hierarchyName,
             hierarchyId: h._id.toString(),
           }));
-
-        logger.debug('Returning hierarchies list', {
-          count: filteredHierarchies.length,
-        });
 
         return {
           hierarchies: filteredHierarchies,
@@ -410,17 +520,18 @@ export class AgentService implements IAgentService {
       }
 
       // If hierarchyId and channelId are provided, return agents
-      const designationService = new DesignationService();
       const designations =
-        await designationService.getDesignationsByHierarchyId(hierarchyId);
+        await this.designationService.getDesignationsByHierarchyId(
+          requestedHierarchyId,
+        );
 
       const agentPromises = designations.map(async designation => {
-        const agents =
-          await this.agentRepository.findAgentsByDesignationAndChannel(
-            designation._id.toString(),
-            channelId,
-          );
-        return agents;
+        return this.agentRepository.findAgentsByDesignationAndChannel(
+          typeof designation._id === 'string'
+            ? designation._id
+            : designation._id.toString(),
+          requestedChannelId,
+        );
       });
 
       const agentResults = await Promise.all(agentPromises);
@@ -441,13 +552,11 @@ export class AgentService implements IAgentService {
         agents,
       };
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
       logger.error('Failed to get agent hierarchy info:', {
-        error: err.message,
-        stack: err.stack,
+        error,
         agentId,
-        hierarchyId,
-        channelId,
+        hierarchyId: requestedHierarchyId,
+        channelId: requestedChannelId,
       });
       throw error;
     }
@@ -475,39 +584,62 @@ export class AgentService implements IAgentService {
         channelId,
       });
 
+      // Validate input IDs
+      if (!Types.ObjectId.isValid(agentId)) {
+        logger.error('Invalid agent ID format', { agentId });
+        throw new DatabaseException(
+          'Invalid agent ID format',
+          'INVALID_AGENT_ID',
+          400,
+        );
+      }
+
+      if (!Types.ObjectId.isValid(channelId)) {
+        logger.error('Invalid channel ID format', { channelId });
+        throw new DatabaseException(
+          'Invalid channel ID format',
+          'INVALID_CHANNEL_ID',
+          400,
+        );
+      }
+
       // Get agent's designation
       const agent = await this.agentRepository.findById(agentId);
       if (!agent) {
         throw new Error('Agent not found');
       }
 
+      logger.debug('Found agent', {
+        agentId,
+        channelId,
+        agentDesignationId: agent.designationId,
+        agentChannelId: agent.channelId,
+      });
+
       // Get hierarchy information
-      const hierarchyService = new HierarchyService();
-      const agentChannelId =
-        typeof agent.channelId === 'string'
-          ? agent.channelId
-          : agent.channelId &&
-              typeof agent.channelId === 'object' &&
-              '_id' in agent.channelId
-            ? agent.channelId._id.toString()
-            : '';
       const hierarchies =
-        await hierarchyService.getHierarchiesByChannel(agentChannelId);
+        await this.hierarchyService.getHierarchiesByChannel(channelId);
 
-      // Find hierarchy with level code 18
-      const targetHierarchy = hierarchies.find(
-        h => h.hierarchyLevelCode === '18',
-      );
-      if (!targetHierarchy) {
-        throw new Error('Target hierarchy level 18 not found');
-      }
+      logger.debug('Found hierarchies', {
+        agentId,
+        channelId,
+        hierarchiesCount: hierarchies.length,
+        hierarchyLevels: hierarchies.map(h => ({
+          id: h._id,
+          name: h.hierarchyName,
+          level: h.hierarchyLevel,
+          levelCode: h.hierarchyLevelCode,
+        })),
+      });
 
-      // Get hierarchies with level less than 18
+      // Get hierarchies with level less than 18 and sort by level
       const filteredHierarchies = hierarchies
-        .filter(h => Number(h.hierarchyLevelCode) < 18)
+        .filter(h => h.hierarchyLevel < 18)
+        .sort((a, b) => a.hierarchyLevel - b.hierarchyLevel)
         .map(h => ({
           hierarchyName: h.hierarchyName,
           hierarchyId: h._id.toString(),
+          hierarchyLevel: h.hierarchyLevel,
           agents: [] as {
             firstName: string;
             lastName: string;
@@ -517,9 +649,19 @@ export class AgentService implements IAgentService {
           }[],
         }));
 
+      logger.debug('Filtered hierarchies', {
+        agentId,
+        channelId,
+        filteredCount: filteredHierarchies.length,
+        hierarchies: filteredHierarchies.map(h => ({
+          id: h.hierarchyId,
+          name: h.hierarchyName,
+          level: h.hierarchyLevel,
+        })),
+      });
+
       // Get all designations and their agents for each hierarchy
-      const designationService = new DesignationService();
-      const hierarchyAgentsMap = new Map<
+      const designationAgentsMap = new Map<
         string,
         (typeof filteredHierarchies)[0]['agents']
       >();
@@ -527,9 +669,20 @@ export class AgentService implements IAgentService {
       await Promise.all(
         filteredHierarchies.map(async hierarchy => {
           const designations =
-            await designationService.getDesignationsByHierarchyId(
+            await this.designationService.getDesignationsByHierarchyId(
               hierarchy.hierarchyId,
             );
+
+          logger.debug('Found designations for hierarchy', {
+            hierarchyId: hierarchy.hierarchyId,
+            hierarchyName: hierarchy.hierarchyName,
+            designationsCount: designations.length,
+            designations: designations.map(d => ({
+              id: d._id,
+              name: d.designationName,
+              code: d.designationCode,
+            })),
+          });
 
           const agentPromises = designations.map(async designation => {
             const agents =
@@ -537,6 +690,13 @@ export class AgentService implements IAgentService {
                 designation._id.toString(),
                 channelId,
               );
+
+            logger.debug('Found agents for designation', {
+              designationId: designation._id,
+              designationName: designation.designationName,
+              agentsCount: agents.length,
+            });
+
             return agents
               .filter(
                 agent =>
@@ -556,25 +716,35 @@ export class AgentService implements IAgentService {
 
           const hierarchyAgents = (await Promise.all(agentPromises)).flat();
           if (hierarchyAgents.length > 0) {
-            hierarchyAgentsMap.set(hierarchy.hierarchyId, hierarchyAgents);
+            designationAgentsMap.set(hierarchy.hierarchyId, hierarchyAgents);
+            logger.debug('Added agents to hierarchy', {
+              hierarchyId: hierarchy.hierarchyId,
+              hierarchyName: hierarchy.hierarchyName,
+              agentsCount: hierarchyAgents.length,
+            });
           }
         }),
       );
 
       // Filter out hierarchies with no agents and combine the data
       const hierarchiesWithAgents = filteredHierarchies
-        .filter(hierarchy => hierarchyAgentsMap.has(hierarchy.hierarchyId))
+        .filter(hierarchy => designationAgentsMap.has(hierarchy.hierarchyId))
         .map(hierarchy => ({
           ...hierarchy,
-          agents: hierarchyAgentsMap.get(hierarchy.hierarchyId) ?? [],
+          agents: designationAgentsMap.get(hierarchy.hierarchyId) ?? [],
         }));
 
-      logger.debug('Successfully retrieved agent hierarchy with agents', {
+      logger.debug('Final hierarchies with agents', {
         hierarchiesCount: hierarchiesWithAgents.length,
-        agentsCount: hierarchiesWithAgents.reduce(
+        agentsTotal: hierarchiesWithAgents.reduce(
           (sum, h) => sum + h.agents.length,
           0,
         ),
+        hierarchies: hierarchiesWithAgents.map(h => ({
+          id: h.hierarchyId,
+          name: h.hierarchyName,
+          agentsCount: h.agents.length,
+        })),
       });
 
       return {

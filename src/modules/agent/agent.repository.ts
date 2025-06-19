@@ -4,6 +4,7 @@ import type { FilterQuery } from 'mongoose';
 import logger from '@/common/utils/logger';
 import type { IAgentRepository } from '@/modules/agent/interfaces/agent.interface';
 import { Types } from 'mongoose';
+import { DatabaseException } from '@/common/exceptions/database.exception';
 
 export class AgentRepository
   extends BaseRepository<IAgent>
@@ -175,14 +176,25 @@ export class AgentRepository
   public async findById(id: string): Promise<IAgent | null> {
     try {
       logger.debug('Finding agent by ID', { id });
+
+      if (!Types.ObjectId.isValid(id)) {
+        logger.error('Invalid ObjectId format for agent', { id });
+        throw new DatabaseException(
+          'Invalid agent ID format',
+          'INVALID_ID_FORMAT',
+          400,
+        );
+      }
+
       const result = await this.model
-        .findOne({ _id: id, isDeleted: false })
+        .findOne({ _id: new Types.ObjectId(id), isDeleted: false })
         .populate('channelId')
         .populate('designationId')
         .populate('projectId')
         .populate('teamLeadId')
         .populate('reportingManagerId')
         .exec();
+
       logger.debug('Agent found by ID', { id, found: !!result });
       return result;
     } catch (error) {
