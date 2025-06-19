@@ -1,0 +1,346 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Salesverse Frontend - Foundation Rules
+
+## Project Architecture & Structure Guidelines
+
+### 1. Directory Organization Standards
+Maintain consistent folder hierarchy across the application:
+
+```
+src/
+├── main.tsx                   # Application entry point
+├── App.tsx                    # Root component
+├── index.css                  # Global styles
+├── vite-env.d.ts             # Vite type definitions
+├── assets/                    # Static resources
+│   ├── images/               # Image files
+│   ├── icons/                # SVG icons and graphics
+│   └── fonts/                # Custom font files
+├── components/               # Reusable UI components
+│   ├── ui/                   # Base UI elements
+│   ├── forms/                # Form components
+│   ├── layout/               # Layout components
+│   └── shared/               # Cross-feature components
+├── features/                 # Feature-based modules
+│   └── [domain]/             # Domain-specific functionality
+│       ├── components/       # Feature components
+│       ├── hooks/            # Feature hooks
+│       ├── services/         # Feature services
+│       ├── types/            # Feature types
+│       └── utils/            # Feature utilities
+├── hooks/                    # Global custom hooks
+├── services/                 # API and external services
+├── types/                    # TypeScript type definitions
+├── config/                   # Application configuration
+├── routes/                   # Routing configuration
+└── utils/                    # Shared utility functions
+```
+
+### 2. File Naming Conventions
+
+#### Component Files
+- **React Components**: Use PascalCase with `.tsx` extension
+  - `UserProfile.tsx` - Main component file
+  - `UserProfileCard.tsx` - Sub-component
+  - `UserProfileModal.tsx` - Modal component
+
+#### Type Definition Files
+- **Interface Files**: Use PascalCase with `.types.ts` extension
+  - `UserProfile.types.ts` - Component prop types
+  - `ApiResponse.types.ts` - API response interfaces
+  - `FormData.types.ts` - Form-related types
+
+#### Hook Files
+- **Custom Hooks**: Use camelCase starting with `use` prefix and `.hook.ts` extension
+  - `useUserProfile.hook.ts` - User profile hook
+  - `useApiData.hook.ts` - Data fetching hook
+  - `useLocalStorage.hook.ts` - Local storage hook
+
+#### Service Files
+- **API Services**: Use camelCase with `.service.ts` extension
+  - `userProfile.service.ts` - User profile API calls
+  - `authentication.service.ts` - Auth-related services
+  - `dataSync.service.ts` - Data synchronization
+
+#### Utility Files
+- **Helper Functions**: Use camelCase with `.util.ts` extension
+  - `dateFormat.util.ts` - Date formatting utilities
+  - `validation.util.ts` - Validation helper functions
+  - `stringManipulation.util.ts` - String utilities
+
+#### Configuration Files
+- **Config Files**: Use camelCase with `.config.ts` extension
+  - `api.config.ts` - API configuration
+  - `theme.config.ts` - Theme settings
+  - `environment.config.ts` - Environment variables
+
+#### Test Files
+- **Test Files**: Match source file name with `.test.tsx` or `.test.ts` extension
+  - `UserProfile.test.tsx` - Component tests
+  - `useUserProfile.test.ts` - Hook tests
+  - `validation.util.test.ts` - Utility tests
+
+#### Style Files
+- **Component Styles**: Match component name with `.module.css` or `.styles.css`
+  - `UserProfile.module.css` - CSS modules
+  - `UserProfile.styles.css` - Component-specific styles
+  - `global.css` - Global styles
+
+#### Asset Files
+- **Images**: Use kebab-case with descriptive names
+  - `user-avatar-placeholder.png`
+  - `company-logo.svg`
+  - `hero-background.jpg`
+
+- **Icons**: Use kebab-case with `icon-` prefix
+  - `icon-chevron-down.svg`
+  - `icon-user-profile.svg`
+  - `icon-notification-bell.svg`
+
+### 3. Component Architecture Principles
+
+#### Component Classification
+- **UI Components**: Pure presentational components in `components/ui/`
+- **Feature Components**: Domain-specific components in `features/[domain]/components/`
+- **Layout Components**: Page structure components in `components/layout/`
+- **Page Components**: Route-level components in `features/[domain]/`
+
+#### Component Structure Standards
+```typescript
+// Component file structure
+import type { ComponentProps } from './ComponentName.types'
+
+export interface ComponentNameProps {
+  // Props interface
+}
+
+export const ComponentName = ({ ...props }: ComponentNameProps) => {
+  // Component implementation
+}
+
+export default ComponentName
+```
+
+### 4. TypeScript Excellence Standards
+
+#### Type Definition Practices
+- Utilize strict TypeScript configuration
+- Define explicit interfaces for all component props
+- Create domain-specific type definitions in feature folders
+- Use utility types for API responses and data transformation
+- Implement discriminated unions for complex state management
+
+#### Import Organization Rules
+```typescript
+// 1. React and library imports
+import React from 'react'
+import { useState, useEffect } from 'react'
+
+// 2. Third-party library imports
+import { useNavigate } from 'react-router-dom'
+import clsx from 'clsx'
+
+// 3. Internal imports - utilities and types
+import type { UserData } from '@/types/user'
+import { formatDate } from '@/utils/date'
+
+// 4. Component imports
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+
+// 5. Relative imports
+import './ComponentName.styles.css'
+```
+
+### 5. State Management Patterns
+
+#### Local State Guidelines
+- Use `useState` for component-specific state
+- Implement `useReducer` for complex state logic
+- Create custom hooks for reusable state logic
+- Maintain immutable state updates
+
+#### Global State Strategy
+- Keep global state minimal and focused
+- Use Context API for theme, user auth, and app-wide settings
+- Implement proper state lifting patterns
+- Consider state management libraries for complex applications
+
+### 6. Performance Optimization Rules
+
+#### Rendering Optimization
+- Implement `React.memo` for expensive components
+- Use `useMemo` for expensive calculations
+- Apply `useCallback` for stable function references
+- Optimize list rendering with proper `key` props
+
+#### Bundle Optimization
+- Implement code splitting at route level
+- Use dynamic imports for large dependencies
+- Optimize image loading with lazy loading
+- Minimize bundle size through tree shaking
+
+### 7. Styling Architecture
+
+#### Tailwind CSS Standards
+- Use utility-first approach with Tailwind classes
+- Create component variants using class composition
+- Implement responsive design with mobile-first approach
+- Use Tailwind's design tokens for consistency
+
+#### Custom Styling Guidelines
+- Place component-specific styles in co-located CSS files
+- Use CSS Modules for scoped styling when needed
+- Implement CSS custom properties for theming
+- Follow BEM methodology for custom CSS classes
+
+### 8. API Integration Standards
+
+#### Service Layer Architecture
+- Create dedicated service files in `services/` directory
+- Implement proper error handling and retry logic
+- Use TypeScript interfaces for API responses
+- Implement request cancellation for cleanup
+
+#### Data Fetching Patterns
+```typescript
+// Custom hook for data fetching
+export const useApiData = <T>(endpoint: string) => {
+  const [data, setData] = useState<T | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Implementation with proper cleanup
+}
+```
+
+### 9. Error Handling Framework
+
+#### Error Boundary Implementation
+- Create error boundaries for route-level error catching
+- Implement fallback UI components for error states
+- Log errors appropriately for debugging
+- Provide user-friendly error messages
+
+#### Validation and Error States
+- Implement form validation with clear error messaging
+- Handle async operation errors gracefully
+- Provide loading states for better user experience
+- Use proper TypeScript error typing
+
+### 10. Testing Strategy
+
+#### Testing File Organization
+- Co-locate test files with components using `.test.tsx` extension
+- Create test utilities in dedicated `__tests__` directories
+- Implement integration tests for critical user flows
+- Use React Testing Library best practices
+
+#### Testing Categories
+- Unit tests for utility functions and hooks
+- Component tests for UI behavior and rendering
+- Integration tests for feature workflows
+- End-to-end tests for critical user journeys
+
+### 11. Accessibility Requirements
+
+#### WCAG Compliance
+- Implement semantic HTML structure
+- Provide proper ARIA labels and roles
+- Ensure keyboard navigation support
+- Maintain adequate color contrast ratios
+
+#### Screen Reader Support
+- Use descriptive alt text for images
+- Implement proper heading hierarchy
+- Provide skip navigation links
+- Test with screen reader software
+
+### 12. Development Workflow Standards
+
+#### Code Quality Gates
+- Run ESLint and Prettier before commits
+- Implement pre-commit hooks with Husky
+- Use TypeScript strict mode for type safety
+- Maintain high test coverage standards
+
+#### Git Workflow Practices
+- Use conventional commit messages
+- Create feature branches for new development
+- Implement proper pull request reviews
+- Maintain clean commit history
+
+### 13. Environment Configuration
+
+#### Development Environment
+- Use Vite for fast development builds
+- Implement hot module replacement
+- Configure development-specific environment variables
+- Set up proper debugging tools
+
+#### Build Configuration
+- Optimize production builds for performance
+- Implement proper asset optimization
+- Configure environment-specific builds
+- Use proper source map configuration
+
+### 14. Security Best Practices
+
+#### Input Sanitization
+- Validate all user inputs on the frontend
+- Implement proper XSS prevention
+- Use Content Security Policy headers
+- Sanitize data before rendering
+
+#### Authentication & Authorization
+- Implement secure token storage
+- Handle authentication state properly
+- Implement proper route protection
+- Use HTTPS for all API communications
+
+### 15. Documentation Standards
+
+#### Code Documentation
+- Document complex business logic with comments
+- Maintain README files for feature modules
+- Document component props and usage examples
+- Keep API documentation updated
+
+#### Architecture Documentation
+- Document architectural decisions
+- Maintain component library documentation
+- Document deployment and build processes
+- Keep dependency documentation current
+
+## Implementation Guidelines
+
+### Before Creating Components
+1. Determine component category and placement
+2. Define TypeScript interfaces for props
+3. Plan component composition and reusability
+4. Consider accessibility requirements
+
+### Before Making Changes
+1. Review existing patterns and consistency
+2. Run type checking and linting
+3. Test component behavior across devices
+4. Verify accessibility compliance
+
+### Code Review Checklist
+1. TypeScript types are properly defined
+2. Components follow naming conventions
+3. Styling follows Tailwind best practices
+4. Accessibility standards are met
+5. Performance considerations are addressed
+
+### Quality Assurance
+- Zero TypeScript errors in production builds
+- All ESLint rules pass without warnings
+- Prettier formatting is consistent
+- No console statements in production code
+- Proper error handling throughout application
+
