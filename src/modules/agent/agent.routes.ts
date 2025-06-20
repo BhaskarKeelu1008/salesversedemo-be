@@ -1,11 +1,37 @@
 import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { AgentController } from './agent.controller';
 import { ValidationPipe } from '@/common/pipes/validation.pipe';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { AgentQueryDto } from './dto/agent-query.dto';
+import multer from 'multer';
+import { BulkAgentUploadDto } from './dto/bulk-agent-upload.dto';
+import { HTTP_STATUS } from '@/common/constants/http-status.constants';
 
 const router = Router();
 const agentController = new AgentController();
+
+// Configure multer for Excel file uploads
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedMimes = [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only Excel files are allowed.'));
+    }
+  },
+});
 
 /**
  * @swagger
@@ -273,10 +299,258 @@ const agentController = new AgentController();
  *               description: Total number of pages
  *               example: 3
  *
+ *     BulkAgentUploadRequest:
+ *       type: object
+ *       required:
+ *         - file
+ *         - projectId
+ *       properties:
+ *         file:
+ *           type: string
+ *           format: binary
+ *           description: Excel file (.xlsx) containing agent data. Maximum size 5MB.
+ *         projectId:
+ *           type: string
+ *           format: uuid
+ *           description: ID of the project to associate agents with
+ *     
+ *     BulkAgentExcelFormat:
+ *       type: object
+ *       description: |
+ *         Excel file should contain the following columns:
+ *         
+ *         Required Fields:
+ *         - Agent First Name (string): First name of the agent
+ *         - Agent Last Name (string): Last name of the agent
+ *         - Email (string): Valid and unique email address
+ *         - Mobile Number (string): Valid phone number format
+ *         - Channel (string): Valid channel name or ID
+ *         - Designation (string): Valid designation name or ID
+ *         
+ *         Optional Fields:
+ *         - Agent Code (string): Unique agent code (will be auto-generated if not provided)
+ *         - Branch (string): Branch name or code
+ *         - Appointment Date (date): Date in YYYY-MM-DD format
+ *         - CA Number (string): CA registration number
+ *         - Province (string): Valid province name
+ *         - City (string): Valid city name
+ *         - Pin Code (string): Postal/ZIP code
+ *         - Status (string): Agent status (active/inactive/suspended)
+ *         - Reporting Manager ID (string): Valid agent ID of reporting manager
+ *         - TIN (string): Tax Identification Number
+ *         
+ *         Validation Rules:
+ *         - Email: Must be unique and valid email format
+ *         - Mobile Number: Must be valid format (e.g., +1234567890)
+ *         - Agent Code: Must be unique if provided
+ *         - Channel: Must exist in the system
+ *         - Designation: Must exist in the system
+ *         - Province & City: Must be valid and exist in the system
+ *         - Reporting Manager ID: Must be a valid existing agent
+ *         - Status: Must be one of: active, inactive, suspended
+ *         - Pin Code: Must be valid format for the country
+ *         
+ *         Example Excel Format:
+ *         | Agent First Name | Agent Last Name | Email | Mobile Number | Channel | Designation | Agent Code | Branch | Appointment Date | CA Number | Province | City | Pin Code | Status | Reporting Manager ID | TIN |
+ *         |-----------------|-----------------|-------|---------------|---------|-------------|------------|--------|-----------------|-----------|----------|------|-----------|--------|---------------------|-----|
+ *         | John | Doe | john.doe@example.com | +1234567890 | Channel1 | Manager | AGT001 | Main | 2025-01-01 | CA123 | Province1 | City1 | 12345 | active | MGR001 | TIN123 |
+ *       properties: {}
+ *     
+ *     BulkAgentUploadResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Whether the upload was successful
+ *           example: true
+ *         message:
+ *           type: string
+ *           description: Status message
+ *           example: "Agents processed successfully"
+ *         data:
+ *           type: object
+ *           properties:
+ *             totalProcessed:
+ *               type: integer
+ *               description: Total number of rows processed
+ *               example: 5
+ *             successCount:
+ *               type: integer
+ *               description: Number of agents successfully created
+ *               example: 4
+ *             failureCount:
+ *               type: integer
+ *               description: Number of rows that failed
+ *               example: 1
+ *             batchSize:
+ *               type: integer
+ *               description: Maximum number of rows processed in one batch
+ *               example: 100
+ *             errors:
+ *               type: array
+ *               description: Details of any errors encountered
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   row:
+ *                     type: integer
+ *                     description: Row number in Excel (1-based)
+ *                     example: 3
+ *                   error:
+ *                     type: string
+ *                     description: Error message
+ *                     example: "Invalid email format"
+ *                   field:
+ *                     type: string
+ *                     description: Field that caused the error
+ *                     example: "Email"
+ *                   data:
+ *                     type: object
+ *                     description: The row data that caused the error
+ *             createdAgents:
+ *               type: array
+ *               description: List of successfully created agents
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   agentCode:
+ *                     type: string
+ *                     description: Generated or provided agent code
+ *                     example: "AGT001"
+ *                   email:
+ *                     type: string
+ *                     description: Agent's email
+ *                     example: "john.doe@example.com"
+ *                   name:
+ *                     type: string
+ *                     description: Agent's full name
+ *                     example: "John Doe"
+ *                   userId:
+ *                     type: string
+ *                     description: ID of the automatically created user
+ *                     example: "507f1f77bcf86cd799439011"
+ *                   status:
+ *                     type: string
+ *                     description: Agent's status
+ *                     example: "active"
+ *
  *   tags:
  *     - name: Agents
  *       description: Agent management endpoints
  */
+
+/**
+ * @swagger
+ * /api/agents/bulk-upload:
+ *   post:
+ *     summary: Upload multiple agents using Excel file
+ *     description: |
+ *       Bulk create agents from an Excel file. The file must follow the specified format with required and optional fields.
+ *       
+ *       Features:
+ *       - Validates all required fields
+ *       - Verifies agent code uniqueness if provided
+ *       - Validates channel and designation existence
+ *       - Verifies province and city existence
+ *       - Validates reporting manager existence
+ *       - Automatically creates user accounts for new agents
+ *       - Generates agent codes if not provided
+ *       - Processes in batches for performance
+ *       - Provides detailed validation errors
+ *       
+ *       Notes:
+ *       - File must be Excel (.xlsx)
+ *       - Maximum file size is 5MB
+ *       - First row must be headers
+ *       - Headers must match the specified column names exactly
+ *       - All required fields must be present
+ *       - Data is validated before processing
+ *       - If any row in a batch fails validation, that batch is skipped
+ *       - Returns detailed error messages for failed rows
+ *     tags: [Agents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - file
+ *               - projectId
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Excel file (.xlsx) containing agent data. Maximum size 5MB.
+ *               projectId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of the project to associate agents with
+ *               batchSize:
+ *                 type: integer
+ *                 description: Optional. Number of rows to process in each batch (default 100, max 500)
+ *                 minimum: 1
+ *                 maximum: 500
+ *                 example: 100
+ *     responses:
+ *       200:
+ *         description: Upload processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/BulkAgentUploadResponse'
+ *       400:
+ *         description: Bad request - validation errors or invalid file
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid file format. Only Excel files are allowed."
+ *                 errors:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["Missing required column: Email", "Invalid file format"]
+ *       413:
+ *         description: File too large (max 5MB)
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  '/bulk-upload',
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.file) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'No file uploaded',
+        });
+        return;
+      }
+
+      if (!req.body.projectId) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'Project ID is required',
+        });
+        return;
+      }
+
+      await agentController.bulkUpload(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 /**
  * @swagger
@@ -359,19 +633,19 @@ router.post(
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter agents by channel ID
+ *         description: Filter by channel ID
  *       - in: query
  *         name: userId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter agents by user ID
+ *         description: Filter by user ID
  *       - in: query
  *         name: projectId
  *         schema:
  *           type: string
  *           format: uuid
- *         description: Filter agents by project ID
+ *         description: Filter by project ID
  *     responses:
  *       200:
  *         description: Agents retrieved successfully

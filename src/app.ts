@@ -19,34 +19,21 @@ import roleRoutes from '@/modules/role/role.routes';
 import { HTTP_STATUS } from '@/common/constants/http-status.constants';
 import eventRoutes from '@/modules/event/event.routes';
 import taskRoutes from '@/modules/task/task.routes';
-import permissionResourceRoutes from '@/modules/permissionResources/permissionResource.routes';
-import permissionRoutes from '@/modules/permission/permission.routes';
-import designationRoutes from '@/modules/designation/designation.routes';
-import authRoutes from '@/modules/auth/auth.routes';
 import agentRoutes from '@/modules/agent/agent.routes';
-import leadRoutes from '@/modules/lead/lead.routes';
-import provinceRoutes from '@/modules/province/province.routes';
-import businessCommitmentRoutes from '@/modules/business-commitment/business-commitment.routes';
-import aobRoutes from '@/modules/aob/aob.routes';
-import productCategoryRoutes from '@/modules/product-category/product-category.routes';
-import productRoutes from '@/modules/product/product.routes';
-import utilityRoutes from '@/modules/utility/utility.routes';
+import designationRoutes from '@/modules/designation/designation.routes';
 import projectRoutes from '@/modules/project/project.routes';
+import productRoutes from '@/modules/product/product.routes';
+import productCategoryRoutes from '@/modules/product-category/product-category.routes';
+import permissionRoutes from '@/modules/permission/permission.routes';
+import permissionResourceRoutes from '@/modules/permissionResources/permissionResource.routes';
 import moduleRoutes from '@/modules/module/module.routes';
-import resourceCenterRoutes from '@/modules/resourceCenter/resource-center.routes';
 import moduleConfigRoutes from '@/modules/module-config/module-config.routes';
 import resourceCenterMasterRoutes from '@/modules/resourceMaster/resource-center-master.routes';
 import cookieParser from 'cookie-parser';
 
 // Session constants
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
-const HOURS_PER_DAY = 24;
-const MILLISECONDS_PER_SECOND = 1000;
-
-const ONE_DAY_IN_SECONDS =
-  HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE;
-const ONE_DAY_IN_MS = ONE_DAY_IN_SECONDS * MILLISECONDS_PER_SECOND;
+const ONE_DAY_IN_SECONDS = 24 * 60 * 60;
+const ONE_DAY_IN_MS = ONE_DAY_IN_SECONDS * 1000;
 const TEN_MINUTES = 10;
 
 export class App {
@@ -77,9 +64,16 @@ export class App {
       }),
     );
     this.app.use(requestLogger);
-    this.app.use(express.json());
+
+    // Skip JSON parsing for multipart/form-data requests
+    this.app.use((req, res, next) => {
+      if (req.headers['content-type']?.includes('multipart/form-data')) {
+        next();
+      } else {
+        express.json()(req, res, next);
+      }
+    });
     this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(cookieParser());
 
     this.app.use(
       session({
@@ -103,6 +97,8 @@ export class App {
         },
       }),
     );
+
+    this.app.use(cookieParser());
   }
 
   private initializePassport(): void {
@@ -120,57 +116,28 @@ export class App {
   }
 
   private initializeRoutes(): void {
-    this.app.use('/health', (req: Request, res: Response) => {
-      const dbHealth = this.databaseProvider.getHealth();
-      res.status(HTTP_STATUS.OK).json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        database: dbHealth,
-      });
-    });
-
-    this.app.use('/api/auth', authRoutes);
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/channels', channelRoutes);
     this.app.use('/api/hierarchies', hierarchyRoutes);
     this.app.use('/api/roles', roleRoutes);
     this.app.use('/api/events', eventRoutes);
-    this.app.use('/api/task', taskRoutes);
+    this.app.use('/api/tasks', taskRoutes);
+    this.app.use('/api/agents', agentRoutes);
+    this.app.use('/api/designations', designationRoutes);
+    this.app.use('/api/projects', projectRoutes);
+    this.app.use('/api/products', productRoutes);
+    this.app.use('/api/product-categories', productCategoryRoutes);
     this.app.use('/api/permissions', permissionRoutes);
     this.app.use('/api/permission-resources', permissionResourceRoutes);
-    this.app.use('/api/designations', designationRoutes);
-    this.app.use('/api/agents', agentRoutes);
-    this.app.use('/api/leads', leadRoutes);
-    this.app.use('/api/provinces', provinceRoutes);
-    this.app.use('/api/business-commitments', businessCommitmentRoutes);
-    this.app.use('/api/aob', aobRoutes);
-    this.app.use('/api/product-categories', productCategoryRoutes);
-    this.app.use('/api/products', productRoutes);
-    this.app.use('/api/utility', utilityRoutes);
-    this.app.use('/api/projects', projectRoutes);
     this.app.use('/api/modules', moduleRoutes);
-    this.app.use('/api/resourceCenter', resourceCenterRoutes);
     this.app.use('/api/module-configs', moduleConfigRoutes);
-    this.app.use('/api/resource-center-master', resourceCenterMasterRoutes);
+    this.app.use('/api/resource-center-masters', resourceCenterMasterRoutes);
 
-    this.app.use('/health/database', (req: Request, res: Response) => {
-      const health = this.databaseProvider.getHealth();
-      const statusCode =
-        health.status === 'connected'
-          ? HTTP_STATUS.OK
-          : HTTP_STATUS.SERVICE_UNAVAILABLE;
-
-      res.status(statusCode).json({
-        ...health,
-        timestamp: new Date().toISOString(),
-      });
-    });
-
+    // Handle 404
     this.app.use((req: Request, res: Response) => {
       res.status(HTTP_STATUS.NOT_FOUND).json({
-        success: false,
-        message: `Route ${req.method} ${req.originalUrl} not found`,
-        timestamp: new Date().toISOString(),
+        status: 'error',
+        message: `Route ${req.path} not found`,
       });
     });
   }
@@ -201,15 +168,13 @@ export class App {
       return new Promise(resolve => {
         this.server = this.app.listen(this.config.port, () => {
           logger.info(`Server is running on port ${this.config.port}`);
-          logger.info(
-            `Swagger documentation available at http://localhost:${this.config.port}/docs`,
-          );
           resolve();
         });
       });
     } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('Failed to start application:', {
+      const err =
+        error instanceof Error ? error : new Error('Failed to start server');
+      logger.error('Failed to start server:', {
         error: err.message,
         stack: err.stack,
       });
@@ -218,38 +183,14 @@ export class App {
   }
 
   public async stop(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const promises: Promise<void>[] = [];
-
-      if (this.databaseProvider.isConnected()) {
-        promises.push(this.databaseProvider.disconnect());
-      }
-
-      if (this.server) {
-        promises.push(
-          new Promise<void>((serverResolve, serverReject) => {
-            this.server!.close(err => {
-              if (err) {
-                serverReject(err);
-                return;
-              }
-              serverResolve();
-            });
-          }),
-        );
-      }
-
-      Promise.all(promises)
-        .then(() => resolve())
-        .catch(reject);
-    });
+    if (this.server) {
+      await this.databaseProvider.disconnect();
+      this.server.close();
+      logger.info('Server stopped');
+    }
   }
 
   public getApp(): Express {
     return this.app;
-  }
-
-  public getDatabaseProvider(): DatabaseProvider {
-    return this.databaseProvider;
   }
 }

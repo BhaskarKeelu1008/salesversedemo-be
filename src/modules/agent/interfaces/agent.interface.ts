@@ -1,8 +1,26 @@
+import { Types } from 'mongoose';
+import type { IUser } from '@/models/user.model';
 import type { Request, Response } from 'express';
 import type { CreateAgentDto } from '@/modules/agent/dto/create-agent.dto';
 import type { AgentResponseDto } from '@/modules/agent/dto/agent-response.dto';
-import type { IAgent } from '@/models/agent.model';
 import type { FilterQuery } from 'mongoose';
+
+interface BulkUploadResult {
+  success: boolean;
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  errors: Array<{
+    row: number;
+    error: string;
+    data: Record<string, any>;
+  }>;
+  createdAgents: Array<{
+    agentCode: string;
+    email: string;
+    name: string;
+  }>;
+}
 
 export interface IAgentRepository {
   create(data: Partial<IAgent>): Promise<IAgent>;
@@ -71,15 +89,43 @@ export interface IAgentService {
       }[];
     }[];
   }>;
+  bulkCreateAgents(
+    data: Record<string, any>[],
+    projectId: string,
+  ): Promise<BulkUploadResult>;
 }
 
 export interface IAgentController {
   createAgent(req: Request, res: Response): Promise<void>;
+  getAllAgents(req: Request, res: Response): Promise<void>;
   getAgentById(req: Request, res: Response): Promise<void>;
   getAgentByCode(req: Request, res: Response): Promise<void>;
-  getAllAgents(req: Request, res: Response): Promise<void>;
-  getActiveAgents(req: Request, res: Response): Promise<void>;
   getAgentsByChannelId(req: Request, res: Response): Promise<void>;
   getAgentsByProjectId(req: Request, res: Response): Promise<void>;
+  getActiveAgents(req: Request, res: Response): Promise<void>;
   getAgentsByUserId(req: Request, res: Response): Promise<void>;
+  bulkUploadAgents(req: Request, res: Response): Promise<void>;
+}
+
+export interface IAgent {
+  _id?: Types.ObjectId;
+  userId: Types.ObjectId | IUser;
+  channelId: Types.ObjectId;
+  designationId: Types.ObjectId;
+  projectId: Types.ObjectId;
+  agentCode: string;
+  employeeId?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  agentStatus: 'active' | 'inactive' | 'suspended';
+  joiningDate: Date;
+  targetAmount?: number;
+  commissionPercentage?: number;
+  isTeamLead?: boolean;
+  teamLeadId?: Types.ObjectId;
+  reportingManagerId?: Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

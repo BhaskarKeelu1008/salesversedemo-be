@@ -15,16 +15,43 @@ import type {
 } from '@/modules/agent/interfaces/agent.interface';
 import type { ValidatedRequest } from '@/common/interfaces/validation.interface';
 import type { GetAgentHierarchyDto } from './dto/get-agent-hierarchy.dto';
+import { BulkAgentUploadService } from './services/bulk-agent-upload.service';
+import * as XLSX from 'xlsx';
+import { Types } from 'mongoose';
+import { AgentRepository } from './agent.repository';
+import { AgentCodeGenerator } from './utils/agent-code-generator';
+import { ChannelRepository } from '../channel/channel.repository';
+import { DesignationRepository } from '../designation/designation.repository';
+import { UserRepository } from '../user/user.repository';
+import { ProjectRepository } from '../project/project.repository';
+import { BadRequestException } from '@/common/exceptions/bad-request.exception';
 
 export class AgentController
   extends BaseController
   implements IAgentController
 {
   private agentService: IAgentService;
+  private readonly agentRepository: AgentRepository;
+  private readonly bulkAgentUploadService: BulkAgentUploadService;
 
   constructor() {
     super();
     this.agentService = new AgentService();
+    this.agentRepository = new AgentRepository();
+    const channelRepository = new ChannelRepository();
+    const designationRepository = new DesignationRepository();
+    const userRepository = new UserRepository();
+    const projectRepository = new ProjectRepository();
+    const agentCodeGenerator = new AgentCodeGenerator();
+
+    this.bulkAgentUploadService = new BulkAgentUploadService(
+      this.agentRepository,
+      channelRepository,
+      designationRepository,
+      userRepository,
+      projectRepository,
+      agentCodeGenerator,
+    );
   }
 
   public createAgent = async (req: Request, res: Response): Promise<void> => {
@@ -399,6 +426,87 @@ export class AgentController
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         err,
       );
+    }
+  }
+
+  public bulkUploadAgents = async (req: Request, res: Response): Promise<void> => {
+    try {
+      logger.debug('Bulk upload agents request received');
+
+      // Check if file is uploaded
+      if (!req.file) {
+        this.sendBadRequest(res, 'Excel file is required');
+        return;
+      }
+
+      // Get projectId from body
+      const { projectId } = req.body;
+
+      if (!projectId) {
+        this.sendBadRequest(res, 'Project ID is required');
+        return;
+      }
+
+      // Process the Excel file
+      const result = await this.bulkAgentUploadService.processExcelFile(
+        req.file.buffer,
+        projectId
+      );
+
+      const isSuccess = result.failureCount === 0;
+      if (isSuccess) {
+        this.sendSuccess(res, result, `Successfully processed ${result.successCount} agents`);
+      } else {
+        this.sendBadRequest(res, `Failed to process ${result.failureCount} agents. Check errors for details.`);
+      }
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to bulk upload agents:', {
+        error: err.message,
+        stack: err.stack,
+      });
+
+      this.sendError(
+        res,
+        'Failed to bulk upload agents',
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        err,
+      );
+    }
+  };
+
+  public async bulkUpload(req: Request, res: Response): Promise<void> {
+    try {
+      const { projectId, batchSize } = req.body;
+      const fileBuffer = req.file?.buffer;
+
+      if (!fileBuffer) {
+        throw new BadRequestException('No file uploaded');
+      }
+
+      const result = await this.bulkAgentUploadService.processExcelFile(
+        fileBuffer,
+        projectId,
+        batchSize,
+      );
+
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Bulk upload processed successfully',
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: error.message,
+        });
+      } else {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+          success: false,
+          message: 'An unknown error occurred',
+        });
+      }
     }
   }
 }

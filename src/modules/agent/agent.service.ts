@@ -17,6 +17,24 @@ import {
 } from './utils/agent-code-generator';
 import { HierarchyRepository } from '@/modules/hierarchy/hierarchy.repository';
 import { DatabaseException } from '@/common/exceptions/database.exception';
+import { UserModel } from '@/models/user.model';
+
+interface BulkUploadResult {
+  success: boolean;
+  totalProcessed: number;
+  successCount: number;
+  failureCount: number;
+  errors: Array<{
+    row: number;
+    error: string;
+    data: Record<string, any>;
+  }>;
+  createdAgents: Array<{
+    agentCode: string;
+    email: string;
+    name: string;
+  }>;
+}
 
 export class AgentService implements IAgentService {
   private agentRepository: IAgentRepository;
@@ -1021,5 +1039,103 @@ export class AgentService implements IAgentService {
     }
 
     return '';
+  }
+
+  public async bulkCreateAgents(
+    data: Record<string, any>[],
+    projectId: string,
+  ): Promise<BulkUploadResult> {
+    const result: BulkUploadResult = {
+      success: true,
+      totalProcessed: data.length,
+      successCount: 0,
+      failureCount: 0,
+      errors: [],
+      createdAgents: [],
+    };
+
+    try {
+      // Find the user associated with the project and role='user'
+      const user = await UserModel.findOne({
+        projectId: new Types.ObjectId(projectId),
+        role: 'user',
+      });
+
+      if (!user) {
+        throw new Error('No user found associated with the project');
+      }
+
+      // Process each row
+      for (const [index, row] of data.entries()) {
+        try {
+          // Validate required fields
+          if (!row.firstName || !row.lastName || !row.email || !row.phoneNumber || !row.channelId || !row.designationId) {
+            result.errors.push({
+              row: index + 1,
+              error: 'Missing required fields (firstName, lastName, email, phoneNumber, channelId, designationId)',
+              data: row,
+            });
+            result.failureCount++;
+            continue;
+          }
+
+          // Validate channelId and designationId format
+          if (!Types.ObjectId.isValid(row.channelId) || !Types.ObjectId.isValid(row.designationId)) {
+            result.errors.push({
+              row: index + 1,
+              error: 'Invalid channelId or designationId format',
+              data: row,
+            });
+            result.failureCount++;
+            continue;
+          }
+
+          // Generate agent code
+          const agentCode = await generateAgentCode(projectId);
+
+          // Create agent
+          const agent = await this.createAgent({
+            userId: user._id.toString(),
+            channelId: row.channelId,
+            designationId: row.designationId,
+            projectId,
+            agentCode,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            email: row.email,
+            phoneNumber: row.phoneNumber,
+            agentStatus: 'active',
+            isTeamLead: false,
+          });
+
+          result.successCount++;
+          result.createdAgents.push({
+            agentCode: agent.agentCode,
+            email: agent.email!,
+            name: `${agent.firstName} ${agent.lastName}`,
+          });
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          result.errors.push({
+            row: index + 1,
+            error: err.message,
+            data: row,
+          });
+          result.failureCount++;
+        }
+      }
+
+      result.success = result.failureCount === 0;
+      return result;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to process bulk agent creation:', {
+        error: err.message,
+        stack: err.stack,
+        projectId,
+        dataLength: data.length,
+      });
+      throw err;
+    }
   }
 }

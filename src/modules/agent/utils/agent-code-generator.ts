@@ -90,3 +90,19 @@ export async function isAgentCodeUnique(agentCode: string): Promise<boolean> {
     throw err;
   }
 }
+
+export class AgentCodeGenerator {
+  async generateCode(projectId: string): Promise<string> {
+    // Get current date components
+    const date = new Date();
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+
+    // Generate a random 4-digit number
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+
+    // Combine components to create unique code
+    return `AGT${year}${month}${day}${random}`;
+  }
+}
