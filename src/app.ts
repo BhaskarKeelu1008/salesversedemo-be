@@ -143,7 +143,6 @@ export class App {
     this.app.use('/api/leads', leadRoutes);
     this.app.use('/api/provinces', provinceRoutes);
     this.app.use('/api/business-commitments', businessCommitmentRoutes);
-    this.app.use('/api/aobDocumentMaster', aobRoutes);
     this.app.use('/api/aob', aobRoutes);
     this.app.use('/api/product-categories', productCategoryRoutes);
     this.app.use('/api/products', productRoutes);

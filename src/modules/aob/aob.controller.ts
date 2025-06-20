@@ -19,6 +19,8 @@ import type { DocumentStatusUpdateDto } from './dto/batch-update-document-status
 import { AobDocumentHistoryModel } from '@/models/aob-document-history.model';
 import type { QcDiscrepancyUpdateDto } from './dto/qc-discrepancy-update.dto';
 import { DocumentStatus } from '@/common/constants/document-status.constants';
+import type { ApplicationPatchDto } from './dto/application-patch.dto';
+import { ApplicationApprovalService } from './services/application-approval.service';
 
 interface ErrorWithMessage {
   message: string;
@@ -27,10 +29,12 @@ interface ErrorWithMessage {
 
 export class AobController extends BaseController {
   private aobService: AobService;
+  private applicationApprovalService: ApplicationApprovalService;
 
   constructor() {
     super();
     this.aobService = new AobService();
+    this.applicationApprovalService = new ApplicationApprovalService();
   }
 
   async createDocumentMaster(
@@ -65,14 +69,7 @@ export class AobController extends BaseController {
     }
   }
 
-  async createBulkDocumentMasters(
-    req: Request<
-      unknown,
-      unknown,
-      BulkCreateAobDocumentMasterDto | CreateAobDocumentMasterDto[]
-    >,
-    res: Response,
-  ) {
+  createBulkDocumentMasters: RequestHandler = async (req, res) => {
     try {
       // Handle both formats: direct array or wrapped in documents object
       let documentsArray: CreateAobDocumentMasterDto[];
@@ -131,7 +128,7 @@ export class AobController extends BaseController {
         err,
       );
     }
-  }
+  };
 
   async getAllDocumentMasters(req: Request, res: Response) {
     try {
@@ -1041,17 +1038,14 @@ export const patchApplication = async (
 ): Promise<void> => {
   try {
     const { applicationId } = req.params;
-    const {
-      type,
-      status,
-      remarks,
-      projectId,
-    }: {
-      type: string;
-      status: string;
-      remarks: string;
-      projectId?: string;
-    } = req.body;
+    const patchData: ApplicationPatchDto = req.body;
+
+    logger.debug('Patching AOB application', {
+      applicationId,
+      type: patchData.type,
+      status: patchData.status,
+      projectId: patchData.projectId,
+    });
 
     if (!applicationId) {
       res.status(400).json({
@@ -1061,7 +1055,10 @@ export const patchApplication = async (
       return;
     }
 
-    if (!type || !['document', 'application'].includes(type)) {
+    if (
+      !patchData.type ||
+      !['document', 'application'].includes(patchData.type)
+    ) {
       res.status(400).json({
         success: false,
         error: 'Invalid type. Must be either "document" or "application"',
@@ -1071,8 +1068,8 @@ export const patchApplication = async (
 
     // Validate projectId if provided
     if (
-      projectId &&
-      !mongoose.Types.ObjectId.isValid(projectId as unknown as string)
+      patchData.projectId &&
+      !mongoose.Types.ObjectId.isValid(patchData.projectId)
     ) {
       res.status(400).json({
         success: false,
@@ -1081,7 +1078,7 @@ export const patchApplication = async (
       return;
     }
 
-    if (type === 'document') {
+    if (patchData.type === 'document') {
       // For now, just return the application data
       const application = await AobApplicationModel.findOne({ applicationId });
       if (!application) {
@@ -1100,14 +1097,14 @@ export const patchApplication = async (
 
     // Handle application type update
     if (
-      !status ||
+      !patchData.status ||
       ![
         'applicationSubmitted',
         'underReview',
         'rejected',
         'approved',
         'returned',
-      ].includes(status)
+      ].includes(patchData.status)
     ) {
       res.status(400).json({
         success: false,
@@ -1116,27 +1113,49 @@ export const patchApplication = async (
       return;
     }
 
-    const updateData: Partial<IAobApplication> = {
-      applicationStatus: status as
-        | 'applicationSubmitted'
-        | 'underReview'
-        | 'rejected'
-        | 'approved'
-        | 'returned',
-    };
+    // Special handling for approved applications
+    if (patchData.status === 'approved' && patchData.projectId) {
+      const approvalService = new ApplicationApprovalService();
+      const result = await approvalService.processApprovedApplication(
+        applicationId,
+        patchData.projectId,
+        patchData.remarks,
+      );
 
-    if (remarks) {
-      updateData.rejectRemark = remarks;
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: result.message,
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Application approved and agent created successfully',
+        data: {
+          application: result.application,
+          agent: result.agent,
+        },
+      });
+      return;
     }
 
-    if (projectId) {
-      updateData.projectId = new mongoose.Types.ObjectId(
-        projectId as unknown as string,
-      );
+    // Regular application update
+    const updateData: Partial<IAobApplication> = {
+      applicationStatus: patchData.status,
+    };
+
+    if (patchData.remarks) {
+      updateData.rejectRemark = patchData.remarks;
+    }
+
+    if (patchData.projectId) {
+      updateData.projectId = new mongoose.Types.ObjectId(patchData.projectId);
     }
 
     // If status is approved, empty the qcAndDiscrepencyList
-    if (status === 'approved') {
+    if (patchData.status === 'approved') {
       updateData.qcAndDiscrepencyList = [];
     }
 

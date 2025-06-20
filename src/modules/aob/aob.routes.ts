@@ -14,6 +14,7 @@ import { ValidationPipe } from '@/common/pipes/validation.pipe';
 import { BatchUpdateDocumentStatusDto } from './dto/batch-update-document-status.dto';
 import { DocumentDetailsQueryDto } from './dto/document-details.dto';
 import { QcDiscrepancyUpdateDto } from './dto/qc-discrepancy-update.dto';
+import { ApplicationPatchDto } from './dto/application-patch.dto';
 
 const router = Router();
 const aobController = new AobController();
@@ -661,7 +662,135 @@ const upload = multer({
  *           type: string
  *           format: date-time
  *           example: "2025-06-19T14:23:29.221Z"
+ *     ApplicationApprovalResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: true
+ *         message:
+ *           type: string
+ *           example: "Application approved and agent created successfully"
+ *         data:
+ *           type: object
+ *           properties:
+ *             application:
+ *               $ref: '#/components/schemas/AobApplication'
+ *             agent:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                   example: "507f1f77bcf86cd799439011"
+ *                 agentCode:
+ *                   type: string
+ *                   example: "IC00001"
+ *         timestamp:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-06-19T14:23:29.221Z"
  */
+
+/**
+ * @swagger
+ * /api/aob:
+ *   post:
+ *     summary: Create bulk AOB document masters
+ *     description: Create multiple AOB document master entries at once. Supports both direct array format and wrapped object format.
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/CreateAobDocumentMasterDto'
+ *                 description: Direct array of document masters
+ *               - $ref: '#/components/schemas/BulkCreateAobDocumentMasterDto'
+ *                 description: Object with documents array property
+ *           examples:
+ *             directArray:
+ *               summary: Direct Array Format
+ *               value:
+ *                 - documentName: "Examination Result (IC Or IIAP) (1 Page)"
+ *                   documentType: "examResult"
+ *                   documentDescription: "Examination result from Insurance Commission or IIAP"
+ *                   documentInstruction: "Maximum 5 MB. PDF, PNG or JPG files"
+ *                   category: ""
+ *                 - documentName: "Accomplished IC Application (4 Pages)"
+ *                   documentType: "icApplicationForm"
+ *                   documentDescription: "IC application form for agent registration"
+ *                   documentInstruction: "Download form here\\nMaximum 5 MB. PDF file only"
+ *                   category: ""
+ *             wrappedObject:
+ *               summary: Wrapped Object Format
+ *               value:
+ *                 documents:
+ *                   - documentName: "Examination Result (IC Or IIAP) (1 Page)"
+ *                     documentType: "examResult"
+ *                     documentDescription: "Examination result from Insurance Commission or IIAP"
+ *                     documentInstruction: "Maximum 5 MB. PDF, PNG or JPG files"
+ *                     category: ""
+ *                   - documentName: "Accomplished IC Application (4 Pages)"
+ *                     documentType: "icApplicationForm"
+ *                     documentDescription: "IC application form for agent registration"
+ *                     documentInstruction: "Download form here\\nMaximum 5 MB. PDF file only"
+ *                     category: ""
+ *     responses:
+ *       201:
+ *         description: Document masters created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Successfully created 12 document masters"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AobDocumentMasterResponseDto'
+ *       400:
+ *         description: Bad request - validation error or invalid format
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/', aobController.createBulkDocumentMasters);
+
+/**
+ * @swagger
+ * /api/aob/application/qcHistoryList:
+ *   get:
+ *     summary: Get QC history list for a document
+ *     tags: [AOB]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: documentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved QC history
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/QcHistoryResponse'
+ *       400:
+ *         description: Bad request - Document ID is required
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/application/qcHistoryList', getQcHistoryList);
 
 /**
  * @swagger
@@ -767,7 +896,6 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.get('/application/qcHistoryList', getQcHistoryList);
 
 // Application routes
 /**
@@ -900,6 +1028,18 @@ router.put('/application/:id', updateApplication);
  *     responses:
  *       200:
  *         description: Application patched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: true
+ *                     data:
+ *                       $ref: '#/components/schemas/AobApplication'
+ *                 - $ref: '#/components/schemas/ApplicationApprovalResponse'
  *       400:
  *         description: Bad request
  *       404:
@@ -907,7 +1047,11 @@ router.put('/application/:id', updateApplication);
  *       500:
  *         description: Internal server error
  */
-router.patch('/application/:applicationId', patchApplication);
+router.patch(
+  '/application/:applicationId',
+  ValidationPipe.validateBody(ApplicationPatchDto),
+  patchApplication,
+);
 
 /**
  * @swagger
@@ -1086,6 +1230,65 @@ router.post('/emailOtpVerification', (req, res, next) =>
 
 /**
  * @swagger
+ * /api/aob/emailVerification:
+ *   get:
+ *     summary: Send email verification OTP
+ *     tags: [AOB]
+ *     parameters:
+ *       - in: query
+ *         name: emailId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: Email address to verify
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *       400:
+ *         description: Bad request - Email ID is required
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/emailVerification', (req, res, next) =>
+  aobController.sendEmailVerificationOtp(req, res, next),
+);
+
+/**
+ * @swagger
+ * /api/aob/emailOtpVerification:
+ *   post:
+ *     summary: Verify email with OTP
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailId
+ *               - otp
+ *             properties:
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *               otp:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Bad request - Invalid OTP or missing fields
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/emailOtpVerification', (req, res, next) =>
+  aobController.verifyEmailOtp(req, res, next),
+);
+
+/**
+ * @swagger
  * /api/aob/getApplication:
  *   get:
  *     summary: Get a single AOB application by ID
@@ -1117,6 +1320,45 @@ router.post('/emailOtpVerification', (req, res, next) =>
  *       500:
  *         description: Internal server error
  */
+router.get('/', (req, res) => {
+  if (req.query.category) {
+    return aobController.getDocumentMastersByCategory(req, res);
+  }
+  return aobController.getAllDocumentMasters(req, res);
+});
+
+/**
+ * @swagger
+ * /api/aob/getApplication:
+ *   get:
+ *     summary: Get a single AOB application by ID
+ *     tags: [AOB]
+ *     parameters:
+ *       - in: query
+ *         name: applicationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the application to retrieve
+ *     responses:
+ *       200:
+ *         description: Application retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   description: Application data
+ *       404:
+ *         description: Application not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get('/getApplication', (req, res, next) =>
   aobController.getApplicationById(req, res, next),
 );
@@ -1143,6 +1385,151 @@ router.get('/getApplication', (req, res, next) =>
  *         description: Internal server error
  */
 router.get('/:id', (req, res) => aobController.getDocumentMasterById(req, res));
+
+/**
+ * @swagger
+ * /api/aob/applicantLogin:
+ *   post:
+ *     summary: Check if an AOB application exists and send OTP
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailId
+ *             properties:
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the applicant
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully or application not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "OTP is sent to applicant@example.com"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     exists:
+ *                       type: boolean
+ *                       example: true
+ *       400:
+ *         description: Bad request - Email ID is required
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/applicantLogin', (req, res, next) =>
+  aobController.checkApplicantExists(req, res, next),
+);
+
+/**
+ * @swagger
+ * /api/aob/applicantOtpValidate:
+ *   post:
+ *     summary: Validate OTP for an AOB application
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailId
+ *               - otp
+ *             properties:
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the applicant
+ *               otp:
+ *                 type: string
+ *                 description: OTP received by the applicant
+ *     responses:
+ *       200:
+ *         description: OTP validation result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Applicant is verified"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     verified:
+ *                       type: boolean
+ *                       example: true
+ *                     applicationData:
+ *                       type: object
+ *                       description: Application data if verified
+ *       400:
+ *         description: Bad request - Email ID and OTP are required
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/applicantOtpValidate', (req, res, next) =>
+  aobController.validateOtp(req, res, next),
+);
+
+/**
+ * @swagger
+ * /api/aob/resendOtp:
+ *   post:
+ *     summary: Resend OTP for an AOB application
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - emailId
+ *             properties:
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address of the applicant
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "OTP is resent to applicant@example.com"
+ *       400:
+ *         description: Bad request - Email ID is required
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/resendOtp', (req, res, next) =>
+  aobController.resendOtp(req, res, next),
+);
 
 /**
  * @swagger
