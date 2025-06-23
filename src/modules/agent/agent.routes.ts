@@ -5,7 +5,6 @@ import { ValidationPipe } from '@/common/pipes/validation.pipe';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { AgentQueryDto } from './dto/agent-query.dto';
 import multer from 'multer';
-import { BulkAgentUploadDto } from './dto/bulk-agent-upload.dto';
 import { HTTP_STATUS } from '@/common/constants/http-status.constants';
 
 const router = Router();
@@ -24,7 +23,7 @@ const upload = multer({
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ];
-    
+
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -313,12 +312,12 @@ const upload = multer({
  *           type: string
  *           format: uuid
  *           description: ID of the project to associate agents with
- *     
+ *
  *     BulkAgentExcelFormat:
  *       type: object
  *       description: |
  *         Excel file should contain the following columns:
- *         
+ *
  *         Required Fields:
  *         - Agent First Name (string): First name of the agent
  *         - Agent Last Name (string): Last name of the agent
@@ -326,7 +325,7 @@ const upload = multer({
  *         - Mobile Number (string): Valid phone number format
  *         - Channel (string): Valid channel name or ID
  *         - Designation (string): Valid designation name or ID
- *         
+ *
  *         Optional Fields:
  *         - Agent Code (string): Unique agent code (will be auto-generated if not provided)
  *         - Branch (string): Branch name or code
@@ -338,7 +337,7 @@ const upload = multer({
  *         - Status (string): Agent status (active/inactive/suspended)
  *         - Reporting Manager ID (string): Valid agent ID of reporting manager
  *         - TIN (string): Tax Identification Number
- *         
+ *
  *         Validation Rules:
  *         - Email: Must be unique and valid email format
  *         - Mobile Number: Must be valid format (e.g., +1234567890)
@@ -349,13 +348,13 @@ const upload = multer({
  *         - Reporting Manager ID: Must be a valid existing agent
  *         - Status: Must be one of: active, inactive, suspended
  *         - Pin Code: Must be valid format for the country
- *         
+ *
  *         Example Excel Format:
  *         | Agent First Name | Agent Last Name | Email | Mobile Number | Channel | Designation | Agent Code | Branch | Appointment Date | CA Number | Province | City | Pin Code | Status | Reporting Manager ID | TIN |
  *         |-----------------|-----------------|-------|---------------|---------|-------------|------------|--------|-----------------|-----------|----------|------|-----------|--------|---------------------|-----|
  *         | John | Doe | john.doe@example.com | +1234567890 | Channel1 | Manager | AGT001 | Main | 2025-01-01 | CA123 | Province1 | City1 | 12345 | active | MGR001 | TIN123 |
  *       properties: {}
- *     
+ *
  *     BulkAgentUploadResponse:
  *       type: object
  *       properties:
@@ -446,27 +445,56 @@ const upload = multer({
  *     summary: Upload multiple agents using Excel file
  *     description: |
  *       Bulk create agents from an Excel file. The file must follow the specified format with required and optional fields.
- *       
- *       Features:
- *       - Validates all required fields
- *       - Verifies agent code uniqueness if provided
- *       - Validates channel and designation existence
- *       - Verifies province and city existence
- *       - Validates reporting manager existence
- *       - Automatically creates user accounts for new agents
- *       - Generates agent codes if not provided
- *       - Processes in batches for performance
- *       - Provides detailed validation errors
- *       
- *       Notes:
+ *
+ *       ### Excel File Format
+ *
+ *       #### Required Columns:
+ *       | Column Name | Description | Format/Rules |
+ *       |------------|-------------|--------------|
+ *       | Agent First Name | First name of the agent | Text |
+ *       | Agent Last Name | Last name of the agent | Text |
+ *       | Email | Email address | Valid email format |
+ *       | Mobile Number | Contact number | Valid phone number format (e.g., +919876543210) |
+ *       | Channel | Channel name or code | Must exist in the system and be mapped to the designation |
+ *       | Designation | Designation name or code | Must exist in the system and be mapped to the channel |
+ *
+ *       #### Optional Columns:
+ *       | Column Name | Description | Format/Rules |
+ *       |------------|-------------|--------------|
+ *       | Agent Code | Unique identifier | If not provided, will be auto-generated |
+ *       | Appointment Date | Joining date | Excel date format |
+ *       | CA Number | Employee/CA ID | Text |
+ *       | Province | Province name | Must exist in the system |
+ *       | City | City name | Must exist in the system |
+ *       | Status | Agent status | One of: active, inactive, suspended (default: active) |
+ *       | Reporting Manager ID | Agent code of reporting manager | Must be an existing agent code |
+ *       | TIN | Tax Identification Number | Text |
+ *
+ *       ### Validation Rules:
+ *       - All required fields must be present and non-empty
+ *       - Email must be in valid format
+ *       - Mobile number must be in valid format
+ *       - Channel must exist and be mapped to the designation
+ *       - Designation must exist and be mapped to the channel
+ *       - Agent Code (if provided) must be unique
+ *       - Reporting Manager (if provided) must exist
+ *       - Status (if provided) must be one of the allowed values
+ *
+ *       ### Example Excel Row:
+ *       ```
+ *       | Agent First Name | Agent Last Name | Email | Mobile Number | Channel | Designation | Agent Code | Appointment Date | Status |
+ *       |-----------------|-----------------|-------|---------------|---------|-------------|------------|-----------------|---------|
+ *       | John | Doe | john.doe@example.com | +919876543210 | Sales | Manager | AGT001 | 2024-01-01 | active |
+ *       ```
+ *
+ *       ### Notes:
  *       - File must be Excel (.xlsx)
  *       - Maximum file size is 5MB
  *       - First row must be headers
- *       - Headers must match the specified column names exactly
- *       - All required fields must be present
- *       - Data is validated before processing
- *       - If any row in a batch fails validation, that batch is skipped
- *       - Returns detailed error messages for failed rows
+ *       - Column names must match exactly
+ *       - Empty rows will be skipped
+ *       - Processing is done in batches
+ *       - Detailed error reporting for failed rows
  *     tags: [Agents]
  *     security:
  *       - bearerAuth: []
@@ -500,7 +528,80 @@ const upload = multer({
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/BulkAgentUploadResponse'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Bulk upload processed successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalProcessed:
+ *                       type: integer
+ *                       description: Total number of rows processed
+ *                       example: 5
+ *                     successCount:
+ *                       type: integer
+ *                       description: Number of agents successfully created
+ *                       example: 4
+ *                     failureCount:
+ *                       type: integer
+ *                       description: Number of rows that failed
+ *                       example: 1
+ *                     batchSize:
+ *                       type: integer
+ *                       description: Batch size used for processing
+ *                       example: 100
+ *                     errors:
+ *                       type: array
+ *                       description: Details of any errors encountered
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           row:
+ *                             type: integer
+ *                             description: Row number in Excel (1-based)
+ *                             example: 3
+ *                           error:
+ *                             type: string
+ *                             description: Error message
+ *                             example: "Invalid email format"
+ *                           field:
+ *                             type: string
+ *                             description: Field that caused the error
+ *                             example: "Email"
+ *                           data:
+ *                             type: object
+ *                             description: The row data that caused the error
+ *                     createdAgents:
+ *                       type: array
+ *                       description: List of successfully created agents
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           agentCode:
+ *                             type: string
+ *                             description: Generated or provided agent code
+ *                             example: "AGT001"
+ *                           email:
+ *                             type: string
+ *                             description: Agent's email
+ *                             example: "john.doe@example.com"
+ *                           name:
+ *                             type: string
+ *                             description: Agent's full name
+ *                             example: "John Doe"
+ *                           userId:
+ *                             type: string
+ *                             description: Associated user ID
+ *                             example: "507f1f77bcf86cd799439011"
+ *                           status:
+ *                             type: string
+ *                             description: Agent's status
+ *                             example: "active"
  *       400:
  *         description: Bad request - validation errors or invalid file
  *         content:
@@ -514,11 +615,6 @@ const upload = multer({
  *                 message:
  *                   type: string
  *                   example: "Invalid file format. Only Excel files are allowed."
- *                 errors:
- *                   type: array
- *                   items:
- *                     type: string
- *                   example: ["Missing required column: Email", "Invalid file format"]
  *       413:
  *         description: File too large (max 5MB)
  *       500:

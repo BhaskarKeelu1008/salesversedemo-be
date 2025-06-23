@@ -306,11 +306,35 @@ export class AuthController extends BaseController implements IAuthController {
       // Continue without role information if there's an error
     }
 
+    // Extract projectId from agent if available
+    let projectId: string | undefined;
+    if (agent.projectId) {
+      if (typeof agent.projectId === 'string') {
+        projectId = agent.projectId;
+      } else if (agent.projectId && typeof agent.projectId === 'object') {
+        // Check if it's a populated object with _id property
+        if (
+          '_id' in agent.projectId &&
+          typeof agent.projectId._id === 'string'
+        ) {
+          projectId = agent.projectId._id;
+        } else if (
+          '_id' in agent.projectId &&
+          agent.projectId._id &&
+          typeof agent.projectId._id === 'object'
+        ) {
+          const objectId = agent.projectId._id as { toString(): string };
+          projectId = objectId.toString();
+        }
+      }
+    }
+
     return this.authService.generateTokensForUser(
       user,
       channelId,
       roleId,
       roleName,
+      projectId,
     );
   }
 

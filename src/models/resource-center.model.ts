@@ -18,6 +18,7 @@ interface RoleInfo {
 
 export interface IResourceCenter extends Document {
   channelId: ChannelInfo[];
+  projectId: mongoose.Types.ObjectId;
   resourceCategory: mongoose.Types.ObjectId;
   subCategory: string[];
   isActive: boolean;
@@ -70,6 +71,11 @@ const resourceCenterSchema = new Schema<IResourceCenter>(
   {
     channelId: {
       type: [channelInfoSchema],
+      required: true,
+    },
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'project',
       required: true,
     },
     resourceCategory: {

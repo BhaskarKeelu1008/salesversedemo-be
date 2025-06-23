@@ -16,10 +16,7 @@ import type {
 import type { ValidatedRequest } from '@/common/interfaces/validation.interface';
 import type { GetAgentHierarchyDto } from './dto/get-agent-hierarchy.dto';
 import { BulkAgentUploadService } from './services/bulk-agent-upload.service';
-import * as XLSX from 'xlsx';
-import { Types } from 'mongoose';
 import { AgentRepository } from './agent.repository';
-import { AgentCodeGenerator } from './utils/agent-code-generator';
 import { ChannelRepository } from '../channel/channel.repository';
 import { DesignationRepository } from '../designation/designation.repository';
 import { UserRepository } from '../user/user.repository';
@@ -42,7 +39,6 @@ export class AgentController
     const designationRepository = new DesignationRepository();
     const userRepository = new UserRepository();
     const projectRepository = new ProjectRepository();
-    const agentCodeGenerator = new AgentCodeGenerator();
 
     this.bulkAgentUploadService = new BulkAgentUploadService(
       this.agentRepository,
@@ -50,7 +46,6 @@ export class AgentController
       designationRepository,
       userRepository,
       projectRepository,
-      agentCodeGenerator,
     );
   }
 
@@ -429,7 +424,10 @@ export class AgentController
     }
   }
 
-  public bulkUploadAgents = async (req: Request, res: Response): Promise<void> => {
+  public bulkUploadAgents = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       logger.debug('Bulk upload agents request received');
 
@@ -450,14 +448,21 @@ export class AgentController
       // Process the Excel file
       const result = await this.bulkAgentUploadService.processExcelFile(
         req.file.buffer,
-        projectId
+        projectId as string,
       );
 
       const isSuccess = result.failureCount === 0;
       if (isSuccess) {
-        this.sendSuccess(res, result, `Successfully processed ${result.successCount} agents`);
+        this.sendSuccess(
+          res,
+          result,
+          `Successfully processed ${result.successCount} agents`,
+        );
       } else {
-        this.sendBadRequest(res, `Failed to process ${result.failureCount} agents. Check errors for details.`);
+        this.sendBadRequest(
+          res,
+          `Failed to process ${result.failureCount} agents. Check errors for details.`,
+        );
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -486,8 +491,8 @@ export class AgentController
 
       const result = await this.bulkAgentUploadService.processExcelFile(
         fileBuffer,
-        projectId,
-        batchSize,
+        projectId as string,
+        batchSize as number,
       );
 
       res.status(HTTP_STATUS.OK).json({

@@ -1,30 +1,31 @@
 import { read as readXlsx, utils as xlsxUtils } from 'xlsx';
-import { AgentRepository } from '../agent.repository';
-import { ChannelRepository } from '@/modules/channel/channel.repository';
-import { DesignationRepository } from '@/modules/designation/designation.repository';
-import { UserRepository } from '@/modules/user/user.repository';
-import { ProjectRepository } from '@/modules/project/project.repository';
+import type { AgentRepository } from '../agent.repository';
+import type { ChannelRepository } from '@/modules/channel/channel.repository';
+import type { DesignationRepository } from '@/modules/designation/designation.repository';
+import type { UserRepository } from '@/modules/user/user.repository';
+import type { ProjectRepository } from '@/modules/project/project.repository';
 import { BadRequestException } from '@/common/exceptions/bad-request.exception';
-import { AgentCodeGenerator } from '../utils/agent-code-generator';
 import { Types } from 'mongoose';
+import { generateAgentCode } from '../utils/agent-code-generator';
+import { getUserIdByProjectId } from '../utils/user-project.util';
 
 interface ExcelRow {
   'Agent First Name': string;
   'Agent Last Name': string;
-  'Email': string;
+  Email: string;
   'Mobile Number': string;
-  'Channel': string;
-  'Designation': string;
+  Channel: string;
+  Designation: string;
   'Agent Code'?: string;
-  'Branch'?: string;
+  Branch?: string;
   'Appointment Date'?: string;
   'CA Number'?: string;
-  'Province'?: string;
-  'City'?: string;
+  Province?: string;
+  City?: string;
   'Pin Code'?: string;
-  'Status'?: string;
+  Status?: string;
   'Reporting Manager ID'?: string;
-  'TIN'?: string;
+  TIN?: string;
   [key: string]: string | undefined;
 }
 
@@ -57,7 +58,6 @@ export class BulkAgentUploadService {
     private readonly designationRepository: DesignationRepository,
     private readonly userRepository: UserRepository,
     private readonly projectRepository: ProjectRepository,
-    private readonly agentCodeGenerator: AgentCodeGenerator,
   ) {}
 
   async processExcelFile(
@@ -116,7 +116,14 @@ export class BulkAgentUploadService {
           agentCode: agent.agentCode,
           email: agent.email ?? '',
           name: `${agent.firstName} ${agent.lastName}`,
-          userId: agent.userId.toString(),
+          userId:
+            typeof agent.userId === 'string'
+              ? agent.userId
+              : agent.userId &&
+                  typeof agent.userId === 'object' &&
+                  '_id' in agent.userId
+                ? agent.userId._id.toString()
+                : '',
           status: agent.agentStatus,
         });
         result.successCount++;
@@ -170,7 +177,7 @@ export class BulkAgentUploadService {
 
     if (errors.length > 0) return errors;
 
-    // Email format validation
+    // Email format and uniqueness validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(row.Email)) {
       errors.push({
@@ -179,33 +186,51 @@ export class BulkAgentUploadService {
         field: 'Email',
         data: row,
       });
+    } else {
+      // Check if email already exists
+      const existingAgent = await this.agentRepository.findOne({
+        email: row.Email,
+      });
+      if (existingAgent) {
+        errors.push({
+          row: rowIndex,
+          error: 'Email already exists',
+          field: 'Email',
+          data: row,
+        });
+      }
     }
 
-    // Phone number format validation
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    if (!phoneRegex.test(row['Mobile Number'])) {
+    // Phone number format and uniqueness validation
+    const mobileNumber = row['Mobile Number'].toString();
+    const phoneRegex = /^[09]\d{10}$/; // 11 digits starting with 0 or 9
+    if (!phoneRegex.test(mobileNumber)) {
       errors.push({
         row: rowIndex,
-        error: 'Invalid phone number format',
+        error: 'Mobile number must be 11 digits and start with 0 or 9',
         field: 'Mobile Number',
         data: row,
       });
-    }
-
-    // Check email uniqueness
-    const existingUserByEmail = await this.userRepository.findOne({ email: row.Email });
-    if (existingUserByEmail) {
-      errors.push({
-        row: rowIndex,
-        error: 'Email already exists',
-        field: 'Email',
-        data: row,
+    } else {
+      // Check if mobile number already exists
+      const existingAgent = await this.agentRepository.findOne({
+        phoneNumber: mobileNumber,
       });
+      if (existingAgent) {
+        errors.push({
+          row: rowIndex,
+          error: 'Mobile number already exists',
+          field: 'Mobile Number',
+          data: row,
+        });
+      }
     }
 
     // Check agent code uniqueness if provided
     if (row['Agent Code']) {
-      const existingAgent = await this.agentRepository.findOne({ agentCode: row['Agent Code'] });
+      const existingAgent = await this.agentRepository.findOne({
+        agentCode: row['Agent Code'],
+      });
       if (existingAgent) {
         errors.push({
           row: rowIndex,
@@ -218,11 +243,7 @@ export class BulkAgentUploadService {
 
     // Validate channel
     const channel = await this.channelRepository.findOne({
-      $or: [
-        { _id: new Types.ObjectId(row.Channel) },
-        { name: row.Channel },
-        { code: row.Channel },
-      ],
+      $or: [{ channelName: row.Channel }, { channelCode: row.Channel }],
     });
     if (!channel) {
       errors.push({
@@ -231,14 +252,14 @@ export class BulkAgentUploadService {
         field: 'Channel',
         data: row,
       });
+      return errors; // Return early as we need channel for further validation
     }
 
     // Validate designation
     const designation = await this.designationRepository.findOne({
       $or: [
-        { _id: new Types.ObjectId(row.Designation) },
-        { name: row.Designation },
-        { code: row.Designation },
+        { designationName: row.Designation },
+        { designationCode: row.Designation },
       ],
     });
     if (!designation) {
@@ -248,15 +269,28 @@ export class BulkAgentUploadService {
         field: 'Designation',
         data: row,
       });
+      return errors; // Return early as we need designation for further validation
+    }
+
+    // Validate channel-designation mapping
+    const designationWithChannel = await this.designationRepository.findOne({
+      _id: designation._id,
+      channelId: channel._id,
+    });
+    if (!designationWithChannel) {
+      errors.push({
+        row: rowIndex,
+        error: `Designation '${row.Designation}' is not mapped to channel '${row.Channel}'`,
+        field: 'Designation',
+        data: row,
+      });
+      return errors;
     }
 
     // Validate reporting manager if provided
     if (row['Reporting Manager ID']) {
       const reportingManager = await this.agentRepository.findOne({
-        $or: [
-          { _id: new Types.ObjectId(row['Reporting Manager ID']) },
-          { agentCode: row['Reporting Manager ID'] },
-        ],
+        agentCode: row['Reporting Manager ID'],
       });
       if (!reportingManager) {
         errors.push({
@@ -269,7 +303,10 @@ export class BulkAgentUploadService {
     }
 
     // Validate status if provided
-    if (row.Status && !['active', 'inactive', 'suspended'].includes(row.Status.toLowerCase())) {
+    if (
+      row.Status &&
+      !['active', 'inactive', 'suspended'].includes(row.Status.toLowerCase())
+    ) {
       errors.push({
         row: rowIndex,
         error: 'Invalid status. Must be one of: active, inactive, suspended',
@@ -284,18 +321,13 @@ export class BulkAgentUploadService {
   private async createAgentFromRow(row: ExcelRow, projectId: string) {
     // Find channel and designation IDs
     const channel = await this.channelRepository.findOne({
-      $or: [
-        { _id: new Types.ObjectId(row.Channel) },
-        { name: row.Channel },
-        { code: row.Channel },
-      ],
+      $or: [{ channelName: row.Channel }, { channelCode: row.Channel }],
     });
 
     const designation = await this.designationRepository.findOne({
       $or: [
-        { _id: new Types.ObjectId(row.Designation) },
-        { name: row.Designation },
-        { code: row.Designation },
+        { designationName: row.Designation },
+        { designationCode: row.Designation },
       ],
     });
 
@@ -307,30 +339,50 @@ export class BulkAgentUploadService {
     let reportingManagerId;
     if (row['Reporting Manager ID']) {
       const reportingManager = await this.agentRepository.findOne({
-        $or: [
-          { _id: new Types.ObjectId(row['Reporting Manager ID']) },
-          { agentCode: row['Reporting Manager ID'] },
-        ],
+        agentCode: row['Reporting Manager ID'],
       });
       reportingManagerId = reportingManager?._id;
     }
 
     // Generate agent code if not provided
-    const agentCode = row['Agent Code'] || await this.agentCodeGenerator.generateCode(projectId);
+    const agentCode = row['Agent Code'] ?? (await generateAgentCode(projectId));
+
+    // Get user ID for the project
+    const userId = await getUserIdByProjectId(projectId);
+
+    // Convert Excel date number to JavaScript Date
+    let joiningDate = new Date();
+    if (row['Appointment Date']) {
+      const excelDate = Number(row['Appointment Date']);
+      if (!isNaN(excelDate)) {
+        // Excel dates are number of days since 1900-01-01
+        // Subtract 2 to account for Excel's date system quirks
+        const daysSince1900 = excelDate - 2;
+        const millisecondsPerDay = 24 * 60 * 60 * 1000;
+        joiningDate = new Date(
+          Date.UTC(1900, 0, 1) + daysSince1900 * millisecondsPerDay,
+        );
+      }
+    }
 
     return this.agentRepository.create({
-      channelId: new Types.ObjectId(channel._id.toString()),
-      designationId: new Types.ObjectId(designation._id.toString()),
+      userId,
+      channelId: channel._id as unknown as Types.ObjectId,
+      designationId: designation._id as unknown as Types.ObjectId,
       projectId: new Types.ObjectId(projectId),
       agentCode,
       employeeId: row['CA Number'],
       firstName: row['Agent First Name'],
       lastName: row['Agent Last Name'],
       email: row.Email,
-      phoneNumber: row['Mobile Number'],
-      agentStatus: (row.Status?.toLowerCase() as 'active' | 'inactive' | 'suspended') || 'active',
-      joiningDate: row['Appointment Date'] ? new Date(row['Appointment Date']) : new Date(),
-      reportingManagerId: reportingManagerId ? new Types.ObjectId(reportingManagerId.toString()) : undefined,
+      phoneNumber: row['Mobile Number'].toString(),
+      agentStatus:
+        (row.Status?.toLowerCase() as 'active' | 'inactive' | 'suspended') ||
+        'active',
+      joiningDate,
+      reportingManagerId: reportingManagerId as unknown as
+        | Types.ObjectId
+        | undefined,
     });
   }
 }

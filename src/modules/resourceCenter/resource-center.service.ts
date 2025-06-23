@@ -160,7 +160,10 @@ export class ResourceCenterService {
     roleId?: string,
     channelId?: string,
     resourceCategory?: string,
-  ): Promise<any[]> {
+    projectId?: string,
+    skip: number = 0,
+    limit: number = 10,
+  ): Promise<{ data: any[]; total: number }> {
     try {
       logger.debug('Fetching resource centers for agents by filters', {
         tag,
@@ -168,16 +171,22 @@ export class ResourceCenterService {
         roleId,
         channelId,
         resourceCategory,
+        projectId,
+        skip,
+        limit,
       });
-      const resourceCenters =
+      const result =
         await this.resourceCenterRepository.getResourceCentersForAgents(
           tag,
           contentType,
           roleId,
           channelId,
           resourceCategory,
+          projectId,
+          skip,
+          limit,
         );
-      return resourceCenters;
+      return result;
     } catch (error) {
       logger.error('Failed to fetch resource centers for agents by filters:', {
         error,
@@ -186,6 +195,9 @@ export class ResourceCenterService {
         roleId,
         channelId,
         resourceCategory,
+        projectId,
+        skip,
+        limit,
       });
       throw error;
     }
@@ -446,20 +458,26 @@ export class ResourceCenterService {
     }
   }
 
-  async getResourceCenterWithDocuments(resourceCenterId: string): Promise<any> {
+  async getResourceCenterWithDocuments(
+    resourceCenterId: string,
+    projectId?: string,
+  ): Promise<any> {
     try {
       logger.debug('Fetching resource center with documents', {
         resourceCenterId,
+        projectId,
       });
       const result =
         await this.resourceCenterRepository.getResourceCenterWithDocuments(
           resourceCenterId,
+          projectId,
         );
       return result;
     } catch (error) {
       logger.error('Failed to fetch resource center with documents:', {
         error,
         resourceCenterId,
+        projectId,
       });
       throw error;
     }

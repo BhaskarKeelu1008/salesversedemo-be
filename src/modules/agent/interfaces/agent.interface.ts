@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import type { IUser } from '@/models/user.model';
 import type { Request, Response } from 'express';
 import type { CreateAgentDto } from '@/modules/agent/dto/create-agent.dto';

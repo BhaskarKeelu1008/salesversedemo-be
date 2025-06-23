@@ -109,6 +109,15 @@ export class ResourceCenterController extends BaseController {
         title: req.body.title,
       });
 
+      // Extract projectId from current user header
+      const currentUserHeader = req.headers.currentuser as string;
+      if (currentUserHeader) {
+        const currentUser = JSON.parse(currentUserHeader);
+        if (currentUser.projectId) {
+          req.body.projectId = currentUser.projectId;
+        }
+      }
+
       const resourceCenter =
         await this.resourceCenterService.createResourceCenter(req.body);
       this.sendCreated(
@@ -143,6 +152,15 @@ export class ResourceCenterController extends BaseController {
     try {
       const { resourceCenterId } = req.params;
       logger.debug('Updating resource center', { resourceCenterId });
+
+      // Extract projectId from current user header
+      const currentUserHeader = req.headers.currentuser as string;
+      if (currentUserHeader) {
+        const currentUser = JSON.parse(currentUserHeader);
+        if (currentUser.projectId) {
+          req.body.projectId = currentUser.projectId;
+        }
+      }
 
       const resourceCenter =
         await this.resourceCenterService.updateResourceCenter(
@@ -238,21 +256,27 @@ export class ResourceCenterController extends BaseController {
 
   async getResourceCentersForAgents(req: Request, res: Response) {
     try {
-      const { tag, contentType, resourceCategory } = req.query;
+      const { tag, contentType, resourceCategory, skip, limit } = req.query;
 
-      // Extract roleId and channelId from current user header
+      // Extract roleId, channelId, and projectId from current user header
       let roleId: string | undefined;
       let channelId: string | undefined;
+      let projectId: string | undefined;
       try {
         const currentUserHeader = req.headers.currentuser as string;
         if (currentUserHeader) {
           const currentUser = JSON.parse(currentUserHeader);
           roleId = currentUser.roleId;
           channelId = currentUser.channelId;
+          projectId = currentUser.projectId;
         }
       } catch (error) {
         logger.warn('Failed to parse current user header:', error);
       }
+
+      // Parse pagination parameters with defaults
+      const skipValue = parseInt(skip as string) || 0;
+      const limitValue = parseInt(limit as string) || 10;
 
       logger.debug('Fetching resource centers for agents by filters', {
         tag,
@@ -260,20 +284,31 @@ export class ResourceCenterController extends BaseController {
         resourceCategory,
         roleId,
         channelId,
+        projectId,
+        skip: skipValue,
+        limit: limitValue,
       });
 
-      const resourceCenters =
+      const result =
         await this.resourceCenterService.getResourceCentersForAgents(
           tag as string,
           contentType as string,
           roleId,
           channelId,
           resourceCategory as string,
+          projectId,
+          skipValue,
+          limitValue,
         );
 
       this.sendSuccess(
         res,
-        resourceCenters,
+        {
+          data: result.data,
+          total: result.total,
+          skip: skipValue,
+          limit: limitValue,
+        },
         'Successfully fetched filtered resource centers for agents.',
       );
     } catch (error) {
@@ -298,9 +333,22 @@ export class ResourceCenterController extends BaseController {
         resourceCenterId,
       });
 
+      // Extract projectId from current user header
+      let projectId: string | undefined;
+      try {
+        const currentUserHeader = req.headers.currentuser as string;
+        if (currentUserHeader) {
+          const currentUser = JSON.parse(currentUserHeader);
+          projectId = currentUser.projectId;
+        }
+      } catch (error) {
+        logger.warn('Failed to parse current user header:', error);
+      }
+
       const result =
         await this.resourceCenterService.getResourceCenterWithDocuments(
           resourceCenterId,
+          projectId,
         );
 
       if (!result) {

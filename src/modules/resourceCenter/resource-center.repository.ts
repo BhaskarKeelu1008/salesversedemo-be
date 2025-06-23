@@ -282,7 +282,10 @@ export class ResourceCenterRepository {
     roleId?: string,
     channelId?: string,
     resourceCategory?: string,
-  ): Promise<any[]> {
+    projectId?: string,
+    skip: number = 0,
+    limit: number = 10,
+  ): Promise<{ data: any[]; total: number }> {
     try {
       logger.debug('Fetching resource centers for agents by filters', {
         tag,
@@ -290,6 +293,9 @@ export class ResourceCenterRepository {
         roleId,
         channelId,
         resourceCategory,
+        projectId,
+        skip,
+        limit,
       });
 
       const query: Record<string, any> = {
@@ -318,9 +324,19 @@ export class ResourceCenterRepository {
         );
       }
 
-      const resourceCenters = await ResourceCenterModel.find(query).sort({
-        createdAt: -1,
-      });
+      // Add projectId filter if provided
+      if (projectId) {
+        query['projectId'] = new mongoose.Types.ObjectId(projectId);
+      }
+
+      // Get total count first
+      const total = await ResourceCenterModel.countDocuments(query);
+
+      // Get paginated results
+      const resourceCenters = await ResourceCenterModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
       // If contentType is specified and not 'all', filter by subCategory
       let filteredResourceCenters = resourceCenters;
@@ -346,7 +362,10 @@ export class ResourceCenterRepository {
         }),
       );
 
-      return resourceCentersWithDocuments;
+      return {
+        data: resourceCentersWithDocuments,
+        total,
+      };
     } catch (error) {
       logger.error('Failed to fetch resource centers for agents by filters:', {
         error,
@@ -355,6 +374,9 @@ export class ResourceCenterRepository {
         roleId,
         channelId,
         resourceCategory,
+        projectId,
+        skip,
+        limit,
       });
       throw error;
     }
@@ -429,14 +451,26 @@ export class ResourceCenterRepository {
     }
   }
 
-  async getResourceCenterWithDocuments(resourceCenterId: string): Promise<any> {
+  async getResourceCenterWithDocuments(
+    resourceCenterId: string,
+    projectId?: string,
+  ): Promise<any> {
     try {
       logger.debug('Fetching resource center with documents', {
         resourceCenterId,
+        projectId,
       });
 
-      const resourceCenter =
-        await ResourceCenterModel.findById(resourceCenterId);
+      const query: Record<string, any> = {
+        _id: resourceCenterId,
+      };
+
+      // Add projectId filter if provided
+      if (projectId) {
+        query['projectId'] = new mongoose.Types.ObjectId(projectId);
+      }
+
+      const resourceCenter = await ResourceCenterModel.findOne(query);
       if (!resourceCenter) {
         return null;
       }
@@ -453,6 +487,7 @@ export class ResourceCenterRepository {
       logger.error('Failed to fetch resource center with documents:', {
         error,
         resourceCenterId,
+        projectId,
       });
       throw error;
     }

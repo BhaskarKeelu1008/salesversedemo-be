@@ -1060,10 +1060,18 @@ export class AgentService implements IAgentService {
       for (const [index, row] of data.entries()) {
         try {
           // Validate required fields
-          if (!row.firstName || !row.lastName || !row.email || !row.phoneNumber || !row.channelId || !row.designationId) {
+          if (
+            !row.firstName ||
+            !row.lastName ||
+            !row.email ||
+            !row.phoneNumber ||
+            !row.channelId ||
+            !row.designationId
+          ) {
             result.errors.push({
               row: index + 1,
-              error: 'Missing required fields (firstName, lastName, email, phoneNumber, channelId, designationId)',
+              error:
+                'Missing required fields (firstName, lastName, email, phoneNumber, channelId, designationId)',
               data: row,
             });
             result.failureCount++;
@@ -1071,7 +1079,10 @@ export class AgentService implements IAgentService {
           }
 
           // Validate channelId and designationId format
-          if (!Types.ObjectId.isValid(row.channelId) || !Types.ObjectId.isValid(row.designationId)) {
+          if (
+            !Types.ObjectId.isValid(row.channelId as string) ||
+            !Types.ObjectId.isValid(row.designationId as string)
+          ) {
             result.errors.push({
               row: index + 1,
               error: 'Invalid channelId or designationId format',

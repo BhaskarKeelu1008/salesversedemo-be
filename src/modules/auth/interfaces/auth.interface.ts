@@ -14,6 +14,7 @@ export interface IAuthService {
     channelId?: string,
     roleId?: string,
     roleName?: string,
+    projectId?: string,
   ): Promise<{
     accessToken: string;
     refreshToken: string;
@@ -63,6 +64,7 @@ export interface ITokenPayload {
   channelId?: string;
   roleId?: string;
   roleName?: string;
+  projectId?: string;
 }
 
 // Extending the Express session interface to include user

@@ -399,7 +399,7 @@ router.put(
 
 /**
  * @swagger
- * /api/admin/resourceCenter:
+ * /api/resourceCenter/admin/list:
  *   get:
  *     summary: Get all resource center entries
  *     tags: [Resource Center]
@@ -410,7 +410,7 @@ router.put(
  *         description: Internal server error
  */
 router.get(
-  '/admin/resourceCenter',
+  '/admin/list',
   resourceCenterController.getAllResourceCenters.bind(
     resourceCenterController,
   ) as unknown as RequestHandler,
@@ -418,7 +418,7 @@ router.get(
 
 /**
  * @swagger
- * /api/admin/resourceCenter:
+ * /api/resourceCenter/agent/list:
  *   get:
  *     summary: Get filtered resource center entries
  *     tags: [Resource Center]
@@ -441,140 +441,222 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-  '/admin/resourceCenter/filter',
+  '/agent/list',
   resourceCenterController.getResourceCentersByFilters.bind(
     resourceCenterController,
   ) as unknown as RequestHandler,
 );
+//  * @swagger
+//  * /api/resourceCenter/agent/resourceCenter:
+//  *   get:
+//  *     summary: Get active and published resource centers for agents
+//  *     tags: [Resource Center]
+//  *     description: Retrieves resource centers that are active (isActive=true) and published (publish='publish') with optional filtering and pagination
+//  *     parameters:
+//  *       - in: query
+//  *         name: tag
+//  *         schema:
+//  *           type: string
+//  *         description: Filter by tag name
+//  *       - in: query
+//  *         name: contentType
+//  *         schema:
+//  *           type: string
+//  *           enum: [all, pdf, video, article, infographics]
+//  *         description: Filter by content type
+//  *       - in: query
+//  *         name: resourceCategory
+//  *         schema:
+//  *           type: string
+//  *         description: Filter by resource category ObjectId
+//  *       - in: query
+//  *         name: skip
+//  *         schema:
+//  *           type: integer
+//  *           default: 0
+//  *         description: Number of items to skip for pagination
+//  *         example: 0
+//  *       - in: query
+//  *         name: limit
+//  *         schema:
+//  *           type: integer
+//  *           default: 10
+//  *         description: Number of items to return
+//  *         example: 10
+//  *     responses:
+//  *       200:
+//  *         description: Active and published resource centers retrieved successfully
+//  *         content:
+//  *           application/json:
+//  *             schema:
+//  *               type: object
+//  *               properties:
+//  *                 success:
+//  *                   type: boolean
+//  *                   example: true
+//  *                 message:
+//  *                   type: string
+//  *                   example: "Successfully fetched filtered resource centers for agents."
+//  *                 data:
+//  *                   type: object
+//  *                   properties:
+//  *                     data:
+//  *                       type: array
+//  *                       items:
+//  *                         type: object
+//  *                         properties:
+//  *                           _id:
+//  *                             type: string
+//  *                             example: "685523f2affd57912514e936"
+//  *                           channelId:
+//  *                             type: array
+//  *                             items:
+//  *                               type: object
+//  *                               properties:
+//  *                                 channelId:
+//  *                                   type: string
+//  *                                   example: "68542552674d4ac104c493d9"
+//  *                                 channelName:
+//  *                                   type: string
+//  *                                   example: "Partner sales"
+//  *                                 _id:
+//  *                                   type: string
+//  *                                   example: "685523f2affd57912514e937"
+//  *                           resourceCategory:
+//  *                             type: string
+//  *                             example: "685521718a8e51c7360ce19a"
+//  *                           subCategory:
+//  *                             type: array
+//  *                             items:
+//  *                               type: string
+//  *                             example: ["VIDEOS", "PDF"]
+//  *                           isActive:
+//  *                             type: boolean
+//  *                             example: true
+//  *                           title:
+//  *                             type: string
+//  *                             example: "Sales Training Guide"
+//  *                           description:
+//  *                             type: string
+//  *                             example: "Comprehensive guide for sales training"
+//  *                           documentId:
+//  *                             type: string
+//  *                             example: "8176964c-658a-46a1-8e7b-7b5c80667abd"
+//  *                           publish:
+//  *                             type: string
+//  *                             enum: [publish, draft]
+//  *                             example: "publish"
+//  *                           tags:
+//  *                             type: array
+//  *                             items:
+//  *                               type: object
+//  *                               properties:
+//  *                                 tagName:
+//  *                                   type: string
+//  *                                   example: "Demo"
+//  *                                 tagId:
+//  *                                   type: string
+//  *                                   example: "685520468a8e51c7360ce189"
+//  *                                 _id:
+//  *                                   type: string
+//  *                                   example: "685523f2affd57912514e938"
+//  *                           roles:
+//  *                             type: array
+//  *                             items:
+//  *                               type: object
+//  *                               properties:
+//  *                                 roleId:
+//  *                                   type: string
+//  *                                   example: "68540b1dd4e96e845ed3e822"
+//  *                                 roleName:
+//  *                                   type: string
+//  *                                   example: "Channel Head"
+//  *                                 _id:
+//  *                                   type: string
+//  *                                   example: "685523f2affd57912514e939"
+//  *                           createdBy:
+//  *                             type: string
+//  *                             example: "507f1f77bcf86cd799439014"
+//  *                           createdAt:
+//  *                             type: string
+//  *                             format: date-time
+//  *                             example: "2025-06-20T09:03:46.343Z"
+//  *                           updatedAt:
+//  *                             type: string
+//  *                             format: date-time
+//  *                             example: "2025-06-20T09:03:46.343Z"
+//  *                           documents:
+//  *                             type: array
+//  *                             items:
+//  *                               type: object
+//  *                             example: []
+//  *                     total:
+//  *                       type: integer
+//  *                       description: Total number of items (before pagination)
+//  *                       example: 1
+//  *                     skip:
+//  *                       type: integer
+//  *                       description: Number of items skipped
+//  *                       example: 0
+//  *                     limit:
+//  *                       type: integer
+//  *                       description: Number of items returned
+//  *                       example: 10
+//  *                 timestamp:
+//  *                   type: string
+//  *                   format: date-time
+//  *                   example: "2025-06-20T09:28:02.650Z"
+//  *             example:
+//  *               success: true
+//  *               message: "Successfully fetched filtered resource centers for agents."
+//  *               data:
+//  *                 data:
+//  *                   - _id: "685523f2affd57912514e936"
+//  *                     channelId:
+//  *                       - channelId: "68542552674d4ac104c493d9"
+//  *                         channelName: "Partner sales"
+//  *                         _id: "685523f2affd57912514e937"
+//  *                     resourceCategory: "685521718a8e51c7360ce19a"
+//  *                     subCategory: ["VIDEOS", "PDF"]
+//  *                     isActive: true
+//  *                     title: "Sales Training Guide"
+//  *                     description: "Comprehensive guide for sales training"
+//  *                     documentId: "8176964c-658a-46a1-8e7b-7b5c80667abd"
+//  *                     publish: "publish"
+//  *                     tags:
+//  *                       - tagName: "Demo"
+//  *                         tagId: "685520468a8e51c7360ce189"
+//  *                         _id: "685523f2affd57912514e938"
+//  *                     roles:
+//  *                       - roleId: "68540b1dd4e96e845ed3e822"
+//  *                         roleName: "Channel Head"
+//  *                         _id: "685523f2affd57912514e939"
+//  *                       - roleId: "68540b1dd4e96e845ed3e827"
+//  *                         roleName: "Business Development Manager"
+//  *                         _id: "685523f2affd57912514e93a"
+//  *                     createdBy: "507f1f77bcf86cd799439014"
+//  *                     createdAt: "2025-06-20T09:03:46.343Z"
+//  *                     updatedAt: "2025-06-20T09:03:46.343Z"
+//  *                     documents: []
+//  *                 total: 1
+//  *                 skip: 0
+//  *                 limit: 10
+//  *               timestamp: "2025-06-20T09:28:02.650Z"
+//  *       500:
+//  *         description: Internal server error
+//  */
+// router.get(
+//   '/agent/resourceCenter',
+//   resourceCenterController.getResourceCentersForAgents.bind(
+//     resourceCenterController,
+//   ) as unknown as RequestHandler,
+// );
 
 /**
  * @swagger
- * /api/resourceCenter/agent/resourceCenter:
+ * /api/resourceCenter/{resourceCenterId}:
  *   get:
- *     summary: Get active and published resource centers for agents
- *     tags: [Resource Center]
- *     description: Retrieves resource centers that are active (isActive=true) and published (publish='publish') with optional filtering
- *     parameters:
- *       - in: query
- *         name: tag
- *         schema:
- *           type: string
- *         description: Filter by tag name
- *       - in: query
- *         name: contentType
- *         schema:
- *           type: string
- *           enum: [all, pdf, video, article, infographics]
- *         description: Filter by content type
- *       - in: query
- *         name: resourceCategory
- *         schema:
- *           type: string
- *         description: Filter by resource category ObjectId
- *     responses:
- *       200:
- *         description: Active and published resource centers retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Successfully fetched filtered resource centers for agents."
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       _id:
- *                         type: string
- *                       channelId:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             channelId:
- *                               type: string
- *                             channelName:
- *                               type: string
- *                       resourceCategory:
- *                         type: string
- *                       subCategory:
- *                         type: array
- *                         items:
- *                           type: string
- *                       isActive:
- *                         type: boolean
- *                         example: true
- *                       title:
- *                         type: string
- *                       description:
- *                         type: string
- *                       documentId:
- *                         type: string
- *                       publish:
- *                         type: string
- *                         enum: [publish, draft]
- *                         example: "publish"
- *                       tags:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             tagName:
- *                               type: string
- *                             tagId:
- *                               type: string
- *                       roles:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             roleId:
- *                               type: string
- *                             roleName:
- *                               type: string
- *                       documents:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             _id:
- *                               type: string
- *                             documentId:
- *                               type: string
- *                             s3Key:
- *                               type: string
- *                             s3Link:
- *                               type: string
- *                             documentType:
- *                               type: array
- *                               items:
- *                                 type: string
- *                             documentFormat:
- *                               type: string
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *       500:
- *         description: Internal server error
- */
-router.get(
-  '/agent/resourceCenter',
-  resourceCenterController.getResourceCentersForAgents.bind(
-    resourceCenterController,
-  ) as unknown as RequestHandler,
-);
-
-/**
- * @swagger
- * /api/admin/resourceCenter/{resourceCenterId}:
- *   get:
- *     summary: Get resource center with documents
+ *     summary: Get Individual resource center with documents
  *     tags: [Resource Center]
  *     parameters:
  *       - in: path
@@ -592,7 +674,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-  '/admin/resourceCenter/:resourceCenterId',
+  '/:resourceCenterId',
   resourceCenterController.getResourceCenterWithDocuments.bind(
     resourceCenterController,
   ) as unknown as RequestHandler,

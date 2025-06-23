@@ -15,6 +15,7 @@ interface RoleInfo {
 
 export class UpdateResourceCenterDto {
   channelId?: ChannelInfo[];
+  projectId?: string;
   resourceCategory?: string;
   subCategory?: string[];
   isActive?: boolean;
