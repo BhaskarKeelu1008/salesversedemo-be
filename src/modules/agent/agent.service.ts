@@ -80,7 +80,7 @@ export class AgentService implements IAgentService {
       }
 
       const agentData = this.prepareAgentData(data, agentCode);
-      const agent = await this.saveAgent(agentData);
+      const agent = await this.agentRepository.create(agentData);
       return await this.fetchPopulatedAgent(agent._id.toString());
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
@@ -122,15 +122,6 @@ export class AgentService implements IAgentService {
         ? new Types.ObjectId(data.reportingManagerId)
         : undefined,
     };
-  }
-
-  private async saveAgent(agentData: Partial<IAgent>): Promise<IAgent> {
-    const agent = await this.agentRepository.create(agentData);
-    logger.info('Agent created successfully', {
-      id: agent._id,
-      code: agent.agentCode,
-    });
-    return agent;
   }
 
   private async fetchPopulatedAgent(
@@ -555,8 +546,8 @@ export class AgentService implements IAgentService {
       const agentResults = await Promise.all(agentPromises);
       const agents = agentResults
         .flat()
-        .filter((agent: IAgent) => agent.firstName && agent.lastName)
-        .map((agent: IAgent) => ({
+        .filter(agent => agent.firstName && agent.lastName)
+        .map(agent => ({
           firstName: agent.firstName!,
           lastName: agent.lastName!,
           id: agent._id.toString(),

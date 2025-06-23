@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import type { CreateAgentDto } from '@/modules/agent/dto/create-agent.dto';
 import type { AgentResponseDto } from '@/modules/agent/dto/agent-response.dto';
 import type { FilterQuery } from 'mongoose';
+import type { IAgent as IAgentModel } from '@/models/agent.model';
 
 interface BulkUploadResult {
   success: boolean;
@@ -23,22 +24,23 @@ interface BulkUploadResult {
 }
 
 export interface IAgentRepository {
-  create(data: Partial<IAgent>): Promise<IAgent>;
-  findById(id: string): Promise<IAgent | null>;
-  findByCode(code: string): Promise<IAgent | null>;
-  findActiveAgents(): Promise<IAgent[]>;
-  findAgentsByChannelId(channelId: string): Promise<IAgent[]>;
-  findAgentsByProjectId(projectId: string): Promise<IAgent[]>;
-  findAgentsByUserId(userId: string): Promise<IAgent[]>;
+  create(data: Partial<IAgentModel>): Promise<IAgentModel>;
+  findById(id: string): Promise<IAgentModel | null>;
+  findByCode(code: string): Promise<IAgentModel | null>;
+  findActiveAgents(): Promise<IAgentModel[]>;
+  findAgentsByChannelId(channelId: string): Promise<IAgentModel[]>;
+  findAgentsByProjectId(projectId: string): Promise<IAgentModel[]>;
+  findAgentsByUserId(userId: string): Promise<IAgentModel[]>;
   findWithPagination(
-    filter?: FilterQuery<IAgent>,
+    filter?: FilterQuery<IAgentModel>,
     page?: number,
     limit?: number,
-  ): Promise<{ agents: IAgent[]; total: number; totalPages: number }>;
+  ): Promise<{ agents: IAgentModel[]; total: number; totalPages: number }>;
   findAgentsByDesignationAndChannel(
     designationId: string,
     channelId: string,
-  ): Promise<IAgent[]>;
+  ): Promise<IAgentModel[]>;
+  findOne(filter: FilterQuery<IAgentModel>): Promise<IAgentModel | null>;
 }
 
 export interface IAgentService {
@@ -112,15 +114,15 @@ export interface IAgent {
   userId: Types.ObjectId | IUser;
   channelId: Types.ObjectId;
   designationId: Types.ObjectId;
-  projectId: Types.ObjectId;
+  projectId?: Types.ObjectId;
   agentCode: string;
   employeeId?: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phoneNumber?: string;
   agentStatus: 'active' | 'inactive' | 'suspended';
-  joiningDate: Date;
+  joiningDate?: Date;
   targetAmount?: number;
   commissionPercentage?: number;
   isTeamLead?: boolean;
@@ -128,4 +130,5 @@ export interface IAgent {
   reportingManagerId?: Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
+  isDeleted?: boolean;
 }
