@@ -180,7 +180,7 @@ const upload = multer({
  *           example: "Sister"
  *         applicationStatus:
  *           type: string
- *           enum: [applicationSubmitted, underReview, rejected, approved, returned]
+ *           enum: [applicationSubmitted, underReview, rejected, qcRejected, approved, returned]
  *           example: "applicationSubmitted"
  *         rejectRemark:
  *           type: string
@@ -226,7 +226,7 @@ const upload = multer({
  *           example: "application"
  *         status:
  *           type: string
- *           enum: [applicationSubmitted, underReview, rejected, approved, returned]
+ *           enum: [applicationSubmitted, underReview, rejected, qcRejected, approved, returned]
  *           example: "approved"
  *         remarks:
  *           type: string
@@ -259,7 +259,7 @@ const upload = multer({
  *           example: "pdf"
  *         documentStatus:
  *           type: string
- *           enum: [approve, reject, documentSubmitted]
+ *           enum: [approve, reject, qcReject, documentSubmitted]
  *           example: "approve"
  *         projectId:
  *           type: string
@@ -290,7 +290,7 @@ const upload = multer({
  *                 example: "APP17500051476209013"
  *               documentStatus:
  *                 type: string
- *                 enum: [approve, reject, documentSubmitted]
+ *                 enum: [approve, reject, qcReject, documentSubmitted]
  *                 example: "reject"
  *               documentType:
  *                 type: string
@@ -414,7 +414,7 @@ const upload = multer({
  *           example: "Email is verified"
  *         applicationStatus:
  *           type: string
- *           enum: [applicationSubmitted, underReview, rejected, approved, returned]
+ *           enum: [applicationSubmitted, underReview, rejected, qcRejected, approved, returned]
  *           example: "approved"
  *         rejectionReason:
  *           type: string
@@ -447,7 +447,7 @@ const upload = multer({
  *                 example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
  *               documentStatus:
  *                 type: string
- *                 enum: [approve, reject, documentSubmitted]
+ *                 enum: [approve, reject, qcReject, documentSubmitted]
  *                 description: The new status for the document
  *                 example: "approve"
  *               remarks:
@@ -516,7 +516,7 @@ const upload = multer({
  *                   example: "APP17500051476209013"
  *                 documentStatus:
  *                   type: string
- *                   enum: [approve, reject, documentSubmitted]
+ *                   enum: [approve, reject, qcReject, documentSubmitted]
  *                   example: "reject"
  *                 documentType:
  *                   type: string
@@ -572,6 +572,8 @@ const upload = multer({
  *                   type: string
  *                 applicationStatus:
  *                   type: string
+ *                   enum: [applicationSubmitted, underReview, rejected, qcRejected, approved, returned]
+ *                   example: "applicationSubmitted"
  *                 projectId:
  *                   type: string
  *         timestamp:
@@ -615,7 +617,7 @@ const upload = multer({
  *                 example: "Life Insurance Exam Result"
  *               status:
  *                 type: string
- *                 enum: [approve, reject]
+ *                 enum: [approve, reject, qcReject]
  *                 description: The status to set for the document
  *                 example: "approve"
  *               remarks:

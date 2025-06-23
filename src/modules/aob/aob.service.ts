@@ -132,7 +132,7 @@ export class AobService {
     documentId: string,
     documentType: string,
     documentFormat: string,
-    documentStatus: 'approve' | 'reject' | 'documentSubmitted',
+    documentStatus: 'approve' | 'reject' | 'qcReject' | 'documentSubmitted',
     file: Express.Multer.File,
     projectId?: string,
   ): Promise<{ document: any }> {
@@ -206,19 +206,21 @@ export class AobService {
         { upsert: true, new: true },
       );
 
-      // Create history record if document is rejected
-      if (documentStatus === 'reject') {
-        await AobDocumentHistoryModel.create({
-          documentId,
-          applicationId: application.applicationId,
-          documentStatus,
-          documentType,
-          documentFormat: documentFormat as 'pdf' | 'png' | 'jpg',
-          documentName: file.originalname,
-          presignedS3Url: s3Url,
-          s3Key,
-        });
+      // Create history record for all status changes
+      await AobDocumentHistoryModel.create({
+        documentId,
+        applicationId: application.applicationId,
+        documentStatus,
+        documentType,
+        documentFormat: documentFormat as 'pdf' | 'png' | 'jpg',
+        documentName: file.originalname,
+        presignedS3Url: s3Url,
+        s3Key,
+        remarks: document.remarks,
+      });
 
+      // Handle specific status actions
+      if (documentStatus === 'reject') {
         // Check if document type already exists in qcAndDiscrepencyList
         const existingDiscrepancy = application.qcAndDiscrepencyList?.find(
           item => item.documentType === documentType,
@@ -262,6 +264,25 @@ export class AobService {
             },
           );
         }
+      } else if (documentStatus === 'qcReject') {
+        // Handle qcReject status - update both document and application status
+        // Update application status to qcRejected
+        await AobApplicationModel.findByIdAndUpdate(
+          application._id,
+          {
+            applicationStatus: 'qcRejected',
+            $push: {
+              qcAndDiscrepencyList: {
+                documentType,
+                documentFormat: documentFormat as 'pdf' | 'png' | 'jpg',
+                documentName: file.originalname,
+                remarks: document.remarks ?? 'Document QC rejected',
+                createdAt: new Date(),
+              },
+            },
+          },
+          { new: true },
+        );
       } else if (documentStatus === 'approve') {
         // Remove document from qcAndDiscrepencyList if status is approve
         await AobApplicationModel.updateOne(
@@ -808,21 +829,21 @@ export class AobService {
             continue;
           }
 
+          // Create history record for all status changes
+          await AobDocumentHistoryModel.create({
+            documentId: doc.documentId,
+            applicationId,
+            documentStatus: doc.documentStatus,
+            documentType: updatedDocument.documentType,
+            documentFormat: updatedDocument.documentFormat,
+            documentName: updatedDocument.documentName,
+            presignedS3Url: updatedDocument.presignedS3Url,
+            s3Key: updatedDocument.s3Key,
+            remarks: doc.remarks,
+          });
+
           // Handle document status specific actions
           if (doc.documentStatus === 'reject') {
-            // Create history record
-            await AobDocumentHistoryModel.create({
-              documentId: doc.documentId,
-              applicationId,
-              documentStatus: doc.documentStatus,
-              documentType: updatedDocument.documentType,
-              documentFormat: updatedDocument.documentFormat,
-              documentName: updatedDocument.documentName,
-              presignedS3Url: updatedDocument.presignedS3Url,
-              s3Key: updatedDocument.s3Key,
-              remarks: doc.remarks,
-            });
-
             // Update or add to qcAndDiscrepencyList
             const existingDiscrepancy = application.qcAndDiscrepencyList?.find(
               item => item.documentType === updatedDocument.documentType,
@@ -862,6 +883,25 @@ export class AobService {
                 },
               );
             }
+          } else if (doc.documentStatus === 'qcReject') {
+            // Handle qcReject status - update both document and application status
+            // Update application status to qcRejected
+            await AobApplicationModel.findByIdAndUpdate(
+              application._id,
+              {
+                applicationStatus: 'qcRejected',
+                $push: {
+                  qcAndDiscrepencyList: {
+                    documentType: updatedDocument.documentType,
+                    documentFormat: updatedDocument.documentFormat,
+                    documentName: updatedDocument.documentName,
+                    remarks: doc.remarks ?? 'Document QC rejected',
+                    createdAt: new Date(),
+                  },
+                },
+              },
+              { new: true },
+            );
           } else if (doc.documentStatus === 'approve') {
             // Remove from qcAndDiscrepencyList if approved
             await AobApplicationModel.updateOne(

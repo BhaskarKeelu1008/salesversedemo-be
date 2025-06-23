@@ -5,7 +5,7 @@ export interface IAobDocumentHistory extends Document {
   presignedS3Url: string;
   documentId: string;
   applicationId: string;
-  documentStatus: 'approve' | 'reject' | 'documentSubmitted';
+  documentStatus: 'approve' | 'reject' | 'documentSubmitted' | 'qcReject';
   remarks?: string;
   documentType: 'pdf' | 'png' | 'jpg';
   documentFormat: 'pdf' | 'png' | 'jpg';
@@ -33,7 +33,7 @@ const AobDocumentHistorySchema = new Schema<IAobDocumentHistory>(
     },
     documentStatus: {
       type: String,
-      enum: ['approve', 'reject', 'documentSubmitted'],
+      enum: ['approve', 'reject', 'qcReject', 'documentSubmitted'],
       required: true,
     },
     remarks: {

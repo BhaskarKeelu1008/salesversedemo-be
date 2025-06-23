@@ -564,11 +564,15 @@ export class AobController extends BaseController {
 
       // Validate that reject status has remarks
       for (const doc of documents) {
-        if (doc.documentStatus === 'reject' && !doc.remarks) {
-          this.sendBadRequest(
-            res,
-            `Remarks are required for rejected document: ${doc.documentId}`,
-          );
+        if (
+          (doc.documentStatus === 'reject' ||
+            doc.documentStatus === 'qcReject') &&
+          !doc.remarks
+        ) {
+          res.status(400).json({
+            success: false,
+            error: `Remarks are required for ${doc.documentStatus}ed document: ${doc.documentId}`,
+          });
           return;
         }
       }
@@ -696,6 +700,31 @@ export class AobController extends BaseController {
             } else {
               application.qcAndDiscrepencyList!.push(discrepancyEntry);
             }
+          } else if (doc.status === DocumentStatus.QCREJECT && doc.remarks) {
+            // Handle qcReject status - update both document and application status
+            const discrepancyEntry: IQcAndDiscrepancyList = {
+              documentType: doc.documentType,
+              documentName: doc.documentName,
+              documentFormat: document.documentFormat || 'pdf',
+              remarks: doc.remarks,
+              createdAt: new Date(),
+            };
+
+            // Add to discrepancy list
+            const discrepancyIndex =
+              application.qcAndDiscrepencyList!.findIndex(
+                d => d.documentType === doc.documentType,
+              );
+
+            if (discrepancyIndex >= 0) {
+              application.qcAndDiscrepencyList![discrepancyIndex] =
+                discrepancyEntry;
+            } else {
+              application.qcAndDiscrepencyList!.push(discrepancyEntry);
+            }
+
+            // Update application status to qcRejected
+            application.applicationStatus = 'qcRejected';
           } else if (doc.status === DocumentStatus.APPROVE) {
             // Remove from discrepancy list if approved
             application.qcAndDiscrepencyList =
@@ -1102,6 +1131,7 @@ export const patchApplication = async (
         'applicationSubmitted',
         'underReview',
         'rejected',
+        'qcRejected',
         'approved',
         'returned',
       ].includes(patchData.status)
@@ -1215,7 +1245,7 @@ export const uploadDocument = async (
       documentId: string;
       documentType: string;
       documentFormat: string;
-      documentStatus: 'approve' | 'reject' | 'documentSubmitted';
+      documentStatus: 'approve' | 'reject' | 'qcReject' | 'documentSubmitted';
       projectId?: string;
     } = req.body;
 
@@ -1229,12 +1259,17 @@ export const uploadDocument = async (
     }
 
     // Validate document status
-    const allowedStatuses = ['approve', 'reject', 'documentSubmitted'];
+    const allowedStatuses = [
+      'approve',
+      'reject',
+      'qcReject',
+      'documentSubmitted',
+    ];
     if (!allowedStatuses.includes(documentStatus)) {
       res.status(400).json({
         success: false,
         error:
-          'Invalid document status. Allowed statuses are: approve, reject, documentSubmitted',
+          'Invalid document status. Allowed statuses are: approve, reject, qcReject, documentSubmitted',
       });
       return;
     }
@@ -1380,10 +1415,14 @@ export const batchUpdateDocumentStatus = async (
 
     // Validate that reject status has remarks
     for (const doc of documents) {
-      if (doc.documentStatus === 'reject' && !doc.remarks) {
+      if (
+        (doc.documentStatus === 'reject' ||
+          doc.documentStatus === 'qcReject') &&
+        !doc.remarks
+      ) {
         res.status(400).json({
           success: false,
-          error: `Remarks are required for rejected document: ${doc.documentId}`,
+          error: `Remarks are required for ${doc.documentStatus}ed document: ${doc.documentId}`,
         });
         return;
       }

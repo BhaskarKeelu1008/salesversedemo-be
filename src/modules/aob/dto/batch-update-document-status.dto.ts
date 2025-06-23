@@ -16,8 +16,8 @@ export class DocumentStatusUpdateDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsIn(['approve', 'reject', 'documentSubmitted'])
-  documentStatus!: 'approve' | 'reject' | 'documentSubmitted';
+  @IsIn(['approve', 'reject', 'qcReject', 'documentSubmitted'])
+  documentStatus!: 'approve' | 'reject' | 'qcReject' | 'documentSubmitted';
 
   @IsString()
   @IsOptional()

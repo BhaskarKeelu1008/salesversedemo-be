@@ -34,6 +34,7 @@ export interface IAobApplication {
     | 'applicationSubmitted'
     | 'underReview'
     | 'rejected'
+    | 'qcRejected'
     | 'approved'
     | 'returned';
   rejectRemark?: string;
@@ -158,6 +159,7 @@ const AobApplicationSchema = new Schema<IAobApplication>(
         'applicationSubmitted',
         'underReview',
         'rejected',
+        'qcRejected',
         'approved',
         'returned',
       ],

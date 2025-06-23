@@ -18,6 +18,7 @@ export class ApplicationPatchDto {
     'applicationSubmitted',
     'underReview',
     'rejected',
+    'qcRejected',
     'approved',
     'returned',
   ])
@@ -25,6 +26,7 @@ export class ApplicationPatchDto {
     | 'applicationSubmitted'
     | 'underReview'
     | 'rejected'
+    | 'qcRejected'
     | 'approved'
     | 'returned';
 

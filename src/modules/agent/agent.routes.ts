@@ -322,7 +322,7 @@ const upload = multer({
  *         - Agent First Name (string): First name of the agent
  *         - Agent Last Name (string): Last name of the agent
  *         - Email (string): Valid and unique email address
- *         - Mobile Number (string): Valid phone number format
+ *         - Mobile Number (string): Valid phone number format, starts with 9 or 0, and has 11 digits
  *         - Channel (string): Valid channel name or ID
  *         - Designation (string): Valid designation name or ID
  *

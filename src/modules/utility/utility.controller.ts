@@ -105,7 +105,10 @@ export class UtilityController extends BaseController {
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailIdStr || !emailRegex.test(emailIdStr)) {
-        this.sendBadRequest(res, 'Valid email address is required');
+        this.sendBadRequest(
+          res,
+          `Valid email address is required - ${emailIdStr}`,
+        );
         return;
       }
 
@@ -127,10 +130,12 @@ export class UtilityController extends BaseController {
       // If OTP is provided, verify it
       if (otpStr) {
         logger.debug('OTP provided, verifying it', { otpStr });
-        const otpRecord = await ApplicantOtpModel.findOne({
+        const otpRecord = await ApplicantOtpModel.find({
           emailAddress: emailIdStr,
           isUsed: false,
-        }).sort({ createdAt: -1 });
+        })
+          .sort({ createdAt: -1 })
+          .limit(1);
 
         if (!otpRecord) {
           this.sendBadRequest(
@@ -142,9 +147,9 @@ export class UtilityController extends BaseController {
 
         // Check if OTP is expired (15 minutes)
         const now = new Date();
-        const otpAge = now.getTime() - otpRecord.createdAt.getTime();
+        const otpAge = now.getTime() - otpRecord[0].createdAt.getTime();
         if (otpAge > 15 * 60 * 1000) {
-          await ApplicantOtpModel.deleteOne({ _id: otpRecord._id });
+          await ApplicantOtpModel.deleteOne({ _id: otpRecord[0]._id });
           this.sendBadRequest(
             res,
             'OTP has expired. Please request a new one.',
@@ -153,14 +158,14 @@ export class UtilityController extends BaseController {
         }
 
         // Validate OTP
-        if (otpRecord.otp !== otpStr) {
+        if (otpRecord[0].otp !== otpStr) {
           this.sendBadRequest(res, 'Invalid OTP');
           return;
         }
 
         // Mark OTP as used
         await ApplicantOtpModel.updateOne(
-          { _id: otpRecord._id },
+          { _id: otpRecord[0]._id },
           { isUsed: true },
         );
 
