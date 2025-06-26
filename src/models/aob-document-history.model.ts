@@ -57,7 +57,7 @@ const AobDocumentHistorySchema = new Schema<IAobDocumentHistory>(
     s3Key: {
       type: String,
       required: true,
-      unique: true,
+      // unique: true,
       trim: true,
     },
   },

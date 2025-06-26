@@ -58,6 +58,7 @@ export interface ILead extends IBaseModel {
   remarkFromUser?: string;
   projectId?: Types.ObjectId;
   moduleId?: Types.ObjectId;
+  source?: string;
 }
 
 const leadSchema = new Schema<ILead>(
@@ -120,6 +121,7 @@ const leadSchema = new Schema<ILead>(
     remarkFromUser: String,
     projectId: { type: Schema.Types.ObjectId, ref: 'Project' },
     moduleId: { type: Schema.Types.ObjectId, ref: 'Module' },
+    source: { type: String },
   },
   {
     timestamps: true,

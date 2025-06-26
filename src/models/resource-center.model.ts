@@ -32,6 +32,12 @@ export interface IResourceCenter extends Document {
   updatedAt: Date;
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
+  files?: {
+    s3Key: string;
+    s3Link: string;
+    documentFormat: string;
+    isActive: boolean;
+  }[];
 }
 
 const channelInfoSchema = new Schema<ChannelInfo>({
@@ -134,6 +140,14 @@ const resourceCenterSchema = new Schema<IResourceCenter>(
       type: Date,
       default: Date.now,
     },
+    files: [
+      {
+        s3Key: { type: String, required: true },
+        s3Link: { type: String, required: true },
+        documentFormat: { type: String, required: true },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
   },
   {
     timestamps: true,

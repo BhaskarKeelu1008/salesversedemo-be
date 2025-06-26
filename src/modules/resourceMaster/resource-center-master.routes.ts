@@ -86,7 +86,7 @@ const resourceCenterMasterController = new ResourceCenterMasterController();
 
 /**
  * @swagger
- * /api/resourceCenterMaster:
+ * /api/resource-center-master:
  *   post:
  *     summary: Create a new resource center master category
  *     tags: [Resource Center Master]
@@ -123,7 +123,7 @@ router.post(
 
 /**
  * @swagger
- * /api/resourceCenterMaster:
+ * /api/resource-center-master:
  *   get:
  *     summary: Get all resource center master categories
  *     tags: [Resource Center Master]
@@ -154,7 +154,7 @@ router.get(
 
 /**
  * @swagger
- * /api/resourceCenterMaster/{id}:
+ * /api/resource-center-master/{id}:
  *   put:
  *     summary: Update a resource center master category
  *     tags: [Resource Center Master]

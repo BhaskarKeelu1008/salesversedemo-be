@@ -295,6 +295,24 @@ router.get(
  *                     roleName:
  *                       type: string
  *                       description: Name of the role
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     s3Key:
+ *                       type: string
+ *                       description: S3 key for the file
+ *                     s3Link:
+ *                       type: string
+ *                       description: S3 link for the file
+ *                     documentFormat:
+ *                       type: string
+ *                       enum: [pdf, png, jpg, mp4]
+ *                       description: Format of the document
+ *                     isActive:
+ *                       type: boolean
+ *                       description: Whether the file is active
  *               updatedBy:
  *                 type: string
  *                 description: ObjectId of the user who updated
@@ -380,6 +398,27 @@ router.post(
  *                     roleName:
  *                       type: string
  *                       description: Name of the role
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       description: ObjectId of existing file (optional, for updating specific files)
+ *                     s3Key:
+ *                       type: string
+ *                       description: S3 key for the file
+ *                     s3Link:
+ *                       type: string
+ *                       description: S3 link for the file
+ *                     documentFormat:
+ *                       type: string
+ *                       enum: [pdf, png, jpg, mp4]
+ *                       description: Format of the document
+ *                     isActive:
+ *                       type: boolean
+ *                       description: Whether the file is active
  *               updatedBy:
  *                 type: string
  *     responses:
@@ -786,7 +825,7 @@ router.post(
 
 /**
  * @swagger
- * /api/resourceCenter/document/{id}:
+ * /api/resourceCenter/document:
  *   patch:
  *     summary: Update a resource center document with file upload
  *     tags: [Resource Center]
@@ -878,9 +917,8 @@ router.post(
  *         description: Internal server error
  */
 router.patch(
-  '/document/:id',
-  upload.single('file'),
-  resourceCenterController.updateResourceCenterDocument.bind(
+  '/document',
+  resourceCenterController.patchResourceCenterFile.bind(
     resourceCenterController,
   ) as unknown as RequestHandler,
 );

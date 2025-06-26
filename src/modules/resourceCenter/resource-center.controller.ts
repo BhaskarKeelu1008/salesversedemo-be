@@ -162,6 +162,36 @@ export class ResourceCenterController extends BaseController {
         }
       }
 
+      // Handle file uploads if present
+      let filesArray = req.body.files;
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Upload each file to S3 and build the files array
+        const uploadedFiles = await Promise.all(
+          req.files.map(async file => {
+            const { s3Key, s3Link } =
+              await this.resourceCenterService['uploadFileToS3'](file);
+            const fileExtension =
+              file.originalname.split('.').pop()?.toLowerCase() ?? '';
+            return {
+              s3Key,
+              s3Link,
+              documentFormat: fileExtension,
+              isActive: true,
+            };
+          }),
+        );
+        // If files were also sent as JSON metadata, merge them
+        if (Array.isArray(filesArray) && filesArray.length > 0) {
+          filesArray = [...filesArray, ...uploadedFiles];
+        } else {
+          filesArray = uploadedFiles;
+        }
+      }
+
+      // Only set files array if it was provided or uploaded
+      if (filesArray !== undefined) {
+        req.body.files = filesArray;
+      }
       const resourceCenter =
         await this.resourceCenterService.updateResourceCenter(
           resourceCenterId,
@@ -472,6 +502,82 @@ export class ResourceCenterController extends BaseController {
       this.sendError(
         res,
         'Failed to update resource center document.',
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        err,
+      );
+    }
+  }
+
+  async patchResourceCenterFile(req: Request, res: Response) {
+    try {
+      const {
+        resourceCenterId,
+        documentId,
+        s3Key,
+        s3Link,
+        documentFormat,
+      }: {
+        resourceCenterId: string;
+        documentId: string;
+        s3Key: string;
+        s3Link: string;
+        documentFormat: string;
+      } = req.body;
+      if (
+        !resourceCenterId ||
+        !documentId ||
+        !s3Key ||
+        !s3Link ||
+        !documentFormat
+      ) {
+        this.sendBadRequest(
+          res,
+          'resourceCenterId, documentId, s3Key, s3Link, and documentFormat are required',
+        );
+        return;
+      }
+      // Validate resourceCenterId is a valid ObjectId
+      if (!resourceCenterId.match(/^[0-9a-fA-F]{24}$/)) {
+        this.sendBadRequest(res, 'Invalid resourceCenterId');
+        return;
+      }
+      // Find the resource center
+      const resourceCenter =
+        await this.resourceCenterService.getResourceCenterById(
+          resourceCenterId,
+        );
+      if (!resourceCenter) {
+        this.sendNotFound(res, 'Resource center not found');
+        return;
+      }
+      // Find the file in files array
+      const fileItem = resourceCenter.files?.find(
+        (file: any) => String(file._id) === String(documentId),
+      );
+      if (!fileItem) {
+        this.sendNotFound(res, 'Document not found in resource center files');
+        return;
+      }
+      // Update the file item
+      fileItem.s3Key = s3Key;
+      fileItem.s3Link = s3Link;
+      fileItem.documentFormat = documentFormat;
+      // Save the resource center
+      await resourceCenter.save();
+      this.sendSuccess(
+        res,
+        fileItem,
+        'Resource center file updated successfully',
+      );
+    } catch (error) {
+      const err = error as ErrorWithMessage;
+      logger.error('Failed to patch resource center file:', {
+        error: err.message,
+        body: req.body,
+      });
+      this.sendError(
+        res,
+        'Failed to patch resource center file.',
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         err,
       );

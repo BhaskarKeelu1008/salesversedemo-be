@@ -15,6 +15,8 @@ import { UserModel, type IUser } from '@/models/user.model';
 import type { IAgent } from '@/models/agent.model';
 import { DesignationModel } from '@/models/designation.model';
 import { RoleModel } from '@/models/role.model';
+import { AccessControlModel } from '@/models/access-control.model';
+import { Types } from 'mongoose';
 
 // Define time constants to avoid magic numbers
 const SEVEN_DAYS = 7;
@@ -246,6 +248,68 @@ export class AuthController extends BaseController implements IAuthController {
     }
   }
 
+  private extractId(value: any): string | null {
+    if (!value) return null;
+    
+    if (typeof value === 'string') {
+      return value;
+    }
+    
+    if (value instanceof Types.ObjectId) {
+      return value.toString();
+    }
+    
+    if (typeof value === 'object' && '_id' in value) {
+      return value._id
+      ? typeof value._id === 'string'
+        ? value._id
+        : (value._id as Types.ObjectId).toString()
+      : '';
+    }
+    
+    return null;
+  }
+
+  private async getRoleIdFromDesignation(designationId: string): Promise<string> {
+    const designation = await DesignationModel.findById(designationId).lean();
+    if (!designation?.roleId) {
+      throw new Error('Role information not found for designation');
+    }
+    return this.extractId(designation.roleId) ?? '';
+  }
+
+  private async getAccessControlConfig(projectId: string, channelId: string) {
+    return AccessControlModel.findOne({
+      projectId: new Types.ObjectId(projectId),
+      channelId: new Types.ObjectId(channelId),
+      isDeleted: false
+    })
+    .populate('moduleConfigs.moduleId', 'name code')
+    .lean();
+  }
+
+  private buildModuleAccessControl(moduleConfig: any, roleId: string) {
+    const roleConfig = moduleConfig.roleConfigs.find(
+      (rc: any) => this.extractId(rc.roleId) === roleId
+    );
+
+    if (!roleConfig) {
+      return null;
+    }
+
+    const moduleDetails = moduleConfig.moduleId;
+    if (!moduleDetails || typeof moduleDetails !== 'object' || !('name' in moduleDetails) || !('code' in moduleDetails)) {
+      return null;
+    }
+
+    return {
+      ModuleID: this.extractId(moduleDetails),
+      ModuleName: moduleDetails.name,
+      ModuleCode: moduleDetails.code,
+      Status: roleConfig.status
+    };
+  }
+
   public async verifyAgentOTP(req: Request, res: Response): Promise<void> {
     try {
       const { agentCode, otp } = req.body as IVerifyAgentOTPBody;
@@ -265,15 +329,45 @@ export class AuthController extends BaseController implements IAuthController {
       const tokens = await this.generateTokensForAgent(user, agent);
       this.setRefreshTokenCookie(res, tokens.refreshToken);
 
-      this.sendSuccess(
-        res,
-        {
-          agent,
-          accessToken: tokens.accessToken,
-          projects: tokens.projects,
-        },
-        'OTP verified successfully',
-      );
+      // Get agent's designation, project, and channel IDs
+      const designationId = this.extractId(agent.designationId);
+      const projectId = this.extractId(agent.projectId);
+      const channelId = this.extractId(agent.channelId);
+
+      if (!designationId || !projectId || !channelId) {
+        this.sendBadRequest(res, 'Missing required agent information');
+        return;
+      }
+
+      try {
+        // Get role ID and access control config
+        const roleId = await this.getRoleIdFromDesignation(designationId);
+        const accessControlConfig = await this.getAccessControlConfig(projectId, channelId);
+
+        if (!accessControlConfig) {
+          this.sendBadRequest(res, 'Access control configuration not found');
+          return;
+        }
+
+        // Build access control array
+        const accessControl = accessControlConfig.moduleConfigs
+          .map(moduleConfig => this.buildModuleAccessControl(moduleConfig, roleId))
+          .filter(Boolean);
+
+        this.sendSuccess(
+          res,
+          {
+            agent,
+            accessToken: tokens.accessToken,
+            projects: tokens.projects,
+            accessControl
+          },
+          'OTP verified successfully',
+        );
+      } catch (error) {
+        logger.error('Error processing access control:', error);
+        this.sendBadRequest(res, error instanceof Error ? error.message : 'Error processing access control');
+      }
     } catch (error) {
       this.handleVerifyOTPError(res, error);
     }

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { RequestHandler } from 'express';
 import {
   AobController,
   createApplication,
@@ -438,9 +439,14 @@ const upload = multer({
  *           items:
  *             type: object
  *             required:
+ *               - _id
  *               - documentId
  *               - documentStatus
  *             properties:
+ *               _id:
+ *                 type: string
+ *                 description: The MongoDB ObjectId of the document
+ *                 example: "507f1f77bcf86cd799439011"
  *               documentId:
  *                 type: string
  *                 description: The document ID
@@ -474,6 +480,9 @@ const upload = multer({
  *               items:
  *                 type: object
  *                 properties:
+ *                   _id:
+ *                     type: string
+ *                     example: "507f1f77bcf86cd799439011"
  *                   documentId:
  *                     type: string
  *                     example: "84bd4fd3-2af4-4dfc-ad11-4fd70b36941f"
@@ -1570,6 +1579,91 @@ router.post(
   '/document/qc-update',
   ValidationPipe.validateBody(QcDiscrepancyUpdateDto),
   (req, res) => aobController.updateQcDiscrepancies(req, res),
+);
+
+/**
+ * @swagger
+ * /api/aob/shareableLink:
+ *   post:
+ *     summary: Send shareable link via email or SMS
+ *     tags: [AOB]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - link
+ *               - notifyType
+ *             properties:
+ *               link:
+ *                 type: string
+ *                 description: The shareable link to send
+ *                 example: "https://example.com/shareable-link"
+ *               notifyType:
+ *                 type: string
+ *                 enum: [email, sms]
+ *                 description: Type of notification to send
+ *                 example: "email"
+ *               emailId:
+ *                 type: string
+ *                 format: email
+ *                 description: Email address (required when notifyType is email)
+ *                 example: "user@example.com"
+ *               smsNo:
+ *                 type: string
+ *                 description: SMS number (required when notifyType is sms)
+ *                 example: "+1234567890"
+ *     responses:
+ *       200:
+ *         description: Notification sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Successful mail has been sent"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     notifyType:
+ *                       type: string
+ *                       example: "email"
+ *                     recipient:
+ *                       type: string
+ *                       example: "user@example.com"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2025-01-27T10:30:00.000Z"
+ *       400:
+ *         description: Bad request - validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Email ID is required when notify type is email"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *       500:
+ *         description: Internal server error
+ */
+router.post(
+  '/shareableLink',
+  aobController.shareableLink.bind(aobController) as unknown as RequestHandler,
 );
 
 export default router;

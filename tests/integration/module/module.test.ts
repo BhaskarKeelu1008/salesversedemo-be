@@ -1,5 +1,5 @@
-import * as dbHandler from 'tests/integration/setup';
 import { ModuleModel } from '@/models/module.model';
+import * as dbHandler from 'tests/integration/setup';
 
 jest.setTimeout(30000);
 
@@ -17,105 +17,94 @@ describe('Module Integration Tests', () => {
   });
 
   describe('Module Model', () => {
-    it('should create a new module successfully', async () => {
-      const moduleData = {
-        name: 'Test Module',
-        code: 'TEST_MOD', // Shortened to fit within 10 characters
-        description: 'Test module description',
-        defaultConfig: {},
-        isActive: true,
-        isCore: false,
-        version: '1.0.0',
-        dependencies: [],
-        permissions: ['test.view', 'test.edit'],
-      };
+    const defaultModuleData = {
+      name: 'Test Module',
+      code: 'TEST_MOD',
+      description: 'Test module description',
+      defaultConfig: [
+        {
+          fieldName: 'testField',
+          fieldType: 'string',
+          description: 'Test field description',
+          values: ['value1', 'value2'],
+        },
+      ],
+      isActive: true,
+      isCore: false,
+      version: '1.0.0',
+      dependencies: [],
+      permissions: ['test.view', 'test.edit'],
+    };
 
-      const module = new ModuleModel(moduleData);
+    it('should create a new module successfully', async () => {
+      const module = new ModuleModel(defaultModuleData);
       const savedModule = await module.save();
 
       expect(savedModule._id).toBeDefined();
-      expect(savedModule.name).toBe(moduleData.name);
-      expect(savedModule.code).toBe(moduleData.code);
-      expect(savedModule.version).toBe(moduleData.version);
-      expect(savedModule.permissions).toEqual(moduleData.permissions);
+      expect(savedModule.name).toBe(defaultModuleData.name);
+      expect(savedModule.code).toBe(defaultModuleData.code);
+      expect(savedModule.version).toBe(defaultModuleData.version);
+      expect(savedModule.permissions).toEqual(defaultModuleData.permissions);
+      expect(savedModule.defaultConfig[0].fieldName).toBe(
+        defaultModuleData.defaultConfig[0].fieldName,
+      );
+      expect(savedModule.defaultConfig[0].fieldType).toBe(
+        defaultModuleData.defaultConfig[0].fieldType,
+      );
     });
-    console.log('test 1');
-    it('should not create a module with duplicate code', async () => {
-      const moduleData = {
-        name: 'Test Module',
-        code: 'TEST_MOD',
-        description: 'Test module description',
-        defaultConfig: {},
-        isActive: true,
-        isCore: false,
-        version: '1.0.0',
-      };
 
-      await ModuleModel.create(moduleData);
+    it('should not create a module with duplicate code', async () => {
+      await ModuleModel.create(defaultModuleData);
 
       // Try to create another module with the same code
       await expect(
         ModuleModel.create({
-          ...moduleData,
+          ...defaultModuleData,
           name: 'Another Module',
         }),
       ).rejects.toThrow(/E11000 duplicate key error/);
     });
 
     it('should find a module by ID', async () => {
-      const moduleData = {
-        name: 'Test Module',
-        code: 'TEST_MOD', // Shortened to fit within 10 characters
-        description: 'Test module description',
-        defaultConfig: {},
-        isActive: true,
-        isCore: false,
-        version: '1.0.0',
-      };
-
-      const savedModule = await new ModuleModel(moduleData).save();
+      const savedModule = await new ModuleModel(defaultModuleData).save();
       const foundModule = await ModuleModel.findById(savedModule._id);
 
       expect(foundModule).not.toBeNull();
-      expect(foundModule?.name).toBe(moduleData.name);
+      expect(foundModule?.name).toBe(defaultModuleData.name);
+      expect(foundModule?.defaultConfig[0].fieldName).toBe(
+        defaultModuleData.defaultConfig[0].fieldName,
+      );
     });
 
     it('should update a module', async () => {
-      const moduleData = {
-        name: 'Test Module',
-        code: 'TEST_MOD', // Shortened to fit within 10 characters
-        description: 'Test module description',
-        defaultConfig: {},
-        isActive: true,
-        isCore: false,
-        version: '1.0.0',
-      };
-
-      const savedModule = await new ModuleModel(moduleData).save();
+      const savedModule = await new ModuleModel(defaultModuleData).save();
 
       const updatedModule = await ModuleModel.findByIdAndUpdate(
         savedModule._id,
-        { name: 'Updated Module Name', version: '1.1.0' },
+        {
+          name: 'Updated Module Name',
+          version: '1.1.0',
+          defaultConfig: [
+            {
+              fieldName: 'updatedField',
+              fieldType: 'number',
+              description: 'Updated field description',
+              values: [1, 2, 3],
+            },
+          ],
+        },
         { new: true },
       );
 
       expect(updatedModule).not.toBeNull();
       expect(updatedModule?.name).toBe('Updated Module Name');
       expect(updatedModule?.version).toBe('1.1.0');
+      expect(updatedModule?.defaultConfig[0].fieldName).toBe('updatedField');
+      expect(updatedModule?.defaultConfig[0].fieldType).toBe('number');
     });
 
     it('should soft delete a module', async () => {
-      const moduleData = {
-        name: 'Test Module',
-        code: 'TEST_MOD', // Shortened to fit within 10 characters
-        description: 'Test module description',
-        defaultConfig: {},
-        isActive: true,
-        isCore: false,
-        version: '1.0.0',
-      };
-
-      const savedModule = await new ModuleModel(moduleData).save();
+      const savedModule = await new ModuleModel(defaultModuleData).save();
 
       const deletedModule = await ModuleModel.findByIdAndUpdate(
         savedModule._id,

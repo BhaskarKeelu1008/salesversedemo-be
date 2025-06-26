@@ -21,6 +21,7 @@ import type { QcDiscrepancyUpdateDto } from './dto/qc-discrepancy-update.dto';
 import { DocumentStatus } from '@/common/constants/document-status.constants';
 import type { ApplicationPatchDto } from './dto/application-patch.dto';
 import { ApplicationApprovalService } from './services/application-approval.service';
+import type { ShareableLinkDto } from './dto/shareable-link.dto';
 
 interface ErrorWithMessage {
   message: string;
@@ -579,6 +580,7 @@ export class AobController extends BaseController {
 
       // Convert documents to proper type
       const typedDocuments: DocumentStatusUpdateDto[] = documents.map(doc => ({
+        _id: String(doc._id),
         documentId: String(doc.documentId),
         documentStatus: doc.documentStatus,
         remarks: doc.remarks,
@@ -787,6 +789,76 @@ export class AobController extends BaseController {
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
         message: 'Failed to update QC discrepancies',
+        error: err.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async shareableLink(
+    req: Request<any, any, ShareableLinkDto>,
+    res: Response,
+  ): Promise<void> {
+    try {
+      const { link, notifyType, emailId, smsNo } = req.body;
+
+      logger.debug('Processing shareable link request', {
+        notifyType,
+        hasEmailId: !!emailId,
+        hasSmsNo: !!smsNo,
+      });
+
+      // Additional validation to ensure either emailId or smsNo is provided
+      if (notifyType === 'email' && !emailId) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'Email ID is required when notify type is email',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (notifyType === 'sms' && !smsNo) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: 'SMS number is required when notify type is sms',
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      // Send notification based on type
+      if (notifyType === 'email' && emailId) {
+        await this.aobService.sendShareableLinkEmail(emailId, link);
+      } else if (notifyType === 'sms' && smsNo) {
+        await this.aobService.sendShareableLinkSms(smsNo, link);
+      }
+
+      logger.info('Shareable link notification sent successfully', {
+        notifyType,
+        recipient: notifyType === 'email' ? emailId : smsNo,
+      });
+
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Successful mail has been sent',
+        data: {
+          notifyType,
+          recipient: notifyType === 'email' ? emailId : smsNo,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to send shareable link notification:', {
+        error: err.message,
+        stack: err.stack,
+        body: req.body,
+      });
+
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: 'Failed to send notification',
         error: err.message,
         timestamp: new Date().toISOString(),
       });

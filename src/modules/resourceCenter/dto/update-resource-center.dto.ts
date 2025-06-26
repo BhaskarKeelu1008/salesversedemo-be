@@ -13,6 +13,14 @@ interface RoleInfo {
   roleName: string;
 }
 
+interface ResourceCenterFileUpdate {
+  s3Key: string;
+  s3Link: string;
+  documentFormat: string;
+  isActive: boolean;
+  _id?: string;
+}
+
 export class UpdateResourceCenterDto {
   channelId?: ChannelInfo[];
   projectId?: string;
@@ -25,4 +33,5 @@ export class UpdateResourceCenterDto {
   tags?: TagInfo[];
   roles?: RoleInfo[];
   updatedBy?: string;
+  files?: ResourceCenterFileUpdate[];
 }

@@ -96,6 +96,7 @@ export class ResourceCenterRepository {
         createdBy: data.createdBy
           ? new mongoose.Types.ObjectId(data.createdBy)
           : undefined,
+        files: data.files ?? [],
       });
 
       return await resourceCenter.save();
@@ -155,6 +156,51 @@ export class ResourceCenterRepository {
         updateData.updatedBy = new mongoose.Types.ObjectId(data.updatedBy);
       }
 
+      // Handle files update: replace or update items by _id if provided
+      if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+        // Fetch the current resource center document
+        const resourceCenterDoc = await ResourceCenterModel.findById(id);
+        if (resourceCenterDoc && Array.isArray(resourceCenterDoc.files)) {
+          // Check if any file in the update has an _id
+          const hasFileWithId = data.files.some(file => file._id);
+
+          if (hasFileWithId) {
+            // Update only files that have _id (existing files)
+            for (const fileUpdate of data.files) {
+              if (fileUpdate._id) {
+                // Try to find the index of the file by _id
+                const fileIndex = resourceCenterDoc.files.findIndex(
+                  (file: any) => String(file._id) === String(fileUpdate._id),
+                );
+                if (fileIndex !== -1) {
+                  // Update only if file exists
+                  resourceCenterDoc.files[fileIndex] = {
+                    ...resourceCenterDoc.files[fileIndex],
+                    s3Key: fileUpdate.s3Key,
+                    s3Link: fileUpdate.s3Link,
+                    documentFormat: fileUpdate.documentFormat,
+                    isActive: fileUpdate.isActive,
+                  };
+                }
+              }
+            }
+          } else {
+            // No files have _id, replace the entire files array
+            resourceCenterDoc.files = data.files;
+          }
+
+          // Update all other fields on the document
+          Object.assign(resourceCenterDoc, updateData);
+
+          await resourceCenterDoc.save();
+          // Return the updated document
+          return resourceCenterDoc;
+        } else {
+          // If no existing document, fallback to default update
+          updateData.files = data.files;
+        }
+      }
+
       return await ResourceCenterModel.findByIdAndUpdate(
         id,
         { $set: updateData },
@@ -194,27 +240,11 @@ export class ResourceCenterRepository {
     }
   }
 
-  async getResourceCenterById(id: string): Promise<any> {
+  async getResourceCenterById(id: string): Promise<IResourceCenter | null> {
     try {
       logger.debug('Finding resource center by ID', { id });
-      const resourceCenter = await ResourceCenterModel.findOne({
-        documentId: id,
-      });
-
-      if (!resourceCenter) {
-        return null;
-      }
-
-      // Fetch related documents using the resource center's documentId (string)
-      const documents = await ResourceCenterDocumentModel.find({
-        documentId: resourceCenter.documentId,
-      });
-
-      // Return resource center with documents
-      return {
-        ...resourceCenter.toObject(),
-        documents,
-      };
+      // Return the Mongoose document directly
+      return await ResourceCenterModel.findById(id);
     } catch (error) {
       logger.error('Failed to find resource center by ID:', { error, id });
       throw error;

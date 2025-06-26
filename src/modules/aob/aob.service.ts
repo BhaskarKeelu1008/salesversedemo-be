@@ -813,16 +813,20 @@ export class AobService {
       // Process each document update
       for (const doc of documents) {
         try {
-          // Update document status
-          const updatedDocument = await AobDocumentModel.findOneAndUpdate(
-            { documentId: doc.documentId, applicationId },
-            { documentStatus: doc.documentStatus },
+          // Update document status using _id
+          const updatedDocument = await AobDocumentModel.findByIdAndUpdate(
+            doc._id,
+            {
+              documentStatus: doc.documentStatus,
+              ...(doc.remarks && { remarks: doc.remarks }),
+            },
             { new: true },
           );
 
           if (!updatedDocument) {
             results.push({
               documentId: doc.documentId,
+              _id: doc._id,
               success: false,
               message: 'Document not found',
             });
@@ -918,6 +922,7 @@ export class AobService {
 
           results.push({
             documentId: doc.documentId,
+            _id: doc._id,
             success: true,
             status: doc.documentStatus,
           });
@@ -925,10 +930,12 @@ export class AobService {
           logger.error('Error processing document in batch update:', {
             error: docError,
             documentId: doc.documentId,
+            _id: doc._id,
           });
 
           results.push({
             documentId: doc.documentId,
+            _id: doc._id,
             success: false,
             message:
               docError instanceof Error ? docError.message : 'Unknown error',
@@ -982,5 +989,47 @@ export class AobService {
       createdAt: documentMaster.createdAt,
       updatedAt: documentMaster.updatedAt,
     };
+  }
+
+  async sendShareableLinkEmail(emailId: string, _link: string): Promise<void> {
+    try {
+      logger.debug('Sending shareable link email', { emailId });
+
+      // TODO: Implement actual email sending logic
+      // This is a placeholder implementation
+      // You would typically use a service like SendGrid, AWS SES, or similar
+
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      logger.info('Shareable link email sent successfully', { emailId });
+    } catch (error) {
+      logger.error('Failed to send shareable link email:', {
+        error: error instanceof Error ? error.message : String(error),
+        emailId,
+      });
+      throw error;
+    }
+  }
+
+  async sendShareableLinkSms(smsNo: string, _link: string): Promise<void> {
+    try {
+      logger.debug('Sending shareable link SMS', { smsNo });
+
+      // TODO: Implement actual SMS sending logic
+      // This is a placeholder implementation
+      // You would typically use a service like Twilio, AWS SNS, or similar
+
+      // Simulate async operation
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      logger.info('Shareable link SMS sent successfully', { smsNo });
+    } catch (error) {
+      logger.error('Failed to send shareable link SMS:', {
+        error: error instanceof Error ? error.message : String(error),
+        smsNo,
+      });
+      throw error;
+    }
   }
 }

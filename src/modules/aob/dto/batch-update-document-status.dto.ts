@@ -10,6 +10,10 @@ import {
 import { Type } from 'class-transformer';
 
 export class DocumentStatusUpdateDto {
+  @IsMongoId()
+  @IsNotEmpty()
+  _id!: string;
+
   @IsString()
   @IsNotEmpty()
   documentId!: string;

@@ -15,6 +15,13 @@ interface RoleInfo {
   roleName: string;
 }
 
+interface ResourceCenterFile {
+  s3Key: string;
+  s3Link: string;
+  documentFormat: string;
+  isActive: boolean;
+}
+
 export class CreateResourceCenterDto {
   channelId!: ChannelInfo[];
   projectId?: string;
@@ -29,6 +36,7 @@ export class CreateResourceCenterDto {
   roles!: RoleInfo[];
   updatedBy?: string;
   createdBy?: string;
+  files?: ResourceCenterFile[];
 
   constructor(data: Partial<CreateResourceCenterDto>) {
     Object.assign(this, data);

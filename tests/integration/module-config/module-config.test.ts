@@ -28,7 +28,14 @@ describe('Module Config Integration Tests', () => {
         name: 'Test Module',
         code: 'TEST_MOD', // Shortened to fit within 10 characters
         description: 'Test module description',
-        defaultConfig: {},
+        defaultConfig: [
+          {
+            fieldName: 'defaultField',
+            fieldType: 'string',
+            description: 'Default field description',
+            values: ['default1', 'default2'],
+          },
+        ],
         isActive: true,
         isCore: false,
         version: '1.0.0',

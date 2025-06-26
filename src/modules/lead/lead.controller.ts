@@ -8,6 +8,8 @@ import { Types } from 'mongoose';
 import { NotFoundException } from '@/common/exceptions/not-found.exception';
 import type { ValidatedRequest } from '@/common/interfaces/validation.interface';
 import type { LeadCreatorQueryDto } from './dto/lead-query.dto';
+import { BulkLeadUploadService } from './services/bulk-lead-upload.service';
+import { leadNotificationService } from '../notification/services/lead-notification.service';
 
 type LeadFilter =
   | 'today'
@@ -50,6 +52,13 @@ interface CreateLeadRequest {
 }
 
 class LeadController extends BaseController {
+  private bulkLeadUploadService: BulkLeadUploadService;
+
+  constructor() {
+    super();
+    this.bulkLeadUploadService = new BulkLeadUploadService();
+  }
+
   public createLead = async (
     req: Request<unknown, unknown, CreateLeadRequest>,
     res: Response,
@@ -102,6 +111,8 @@ class LeadController extends BaseController {
 
       // Create lead
       const lead = await leadService.createLead(leadData);
+
+      await leadNotificationService.notifyLeadCreation(lead);
 
       this.sendCreated(res, {
         message: 'Lead created successfully. Please update additional details.',
@@ -165,6 +176,11 @@ class LeadController extends BaseController {
       });
 
       const lead = await leadService.updateLead(id, updateData);
+
+      if (objectIdFields.includes('allocatedTo')) {
+        await leadNotificationService.notifyLeadAllocation(lead);
+      }
+
       this.sendSuccess(res, lead);
     } catch (error) {
       this.handleError(error as Error, res);
@@ -266,6 +282,7 @@ class LeadController extends BaseController {
         new Types.ObjectId(allocatedBy),
       );
 
+      await leadNotificationService.notifyLeadAllocation(lead);
       this.sendSuccess(res, lead);
     } catch (error) {
       this.handleError(error as Error, res);
@@ -416,6 +433,41 @@ class LeadController extends BaseController {
       this.handleError(error as Error, res);
     }
   };
+
+  public async bulkUpload(req: Request, res: Response): Promise<void> {
+    try {
+      const { projectId, batchSize } = req.body;
+      const fileBuffer = req.file?.buffer;
+
+      if (!fileBuffer) {
+        throw new BadRequestException('No file uploaded');
+      }
+
+      const result = await this.bulkLeadUploadService.processExcelFile(
+        fileBuffer,
+        projectId as string,
+        batchSize as number,
+      );
+
+      res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Bulk upload processed successfully',
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        res.status(HTTP_STATUS.BAD_REQUEST).json({
+          success: false,
+          message: error.message,
+        });
+      } else {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+          success: false,
+          message: 'An unknown error occurred',
+        });
+      }
+    }
+  }
 
   private handleError(error: Error, res: Response): void {
     this.sendError(res, error.message, HTTP_STATUS.INTERNAL_SERVER_ERROR);

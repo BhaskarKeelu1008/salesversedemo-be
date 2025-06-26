@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
@@ -21,11 +20,4 @@ afterEach(async () => {
   for (const key in collections) {
     await collections[key].deleteMany({});
   }
-});
-
-describe('Database Test Setup', () => {
-  test('MongoDB memory server functions should be defined', () => {
-    expect(mongoServer).toBeDefined();
-    expect(mongoose).toBeDefined();
-  });
 });
