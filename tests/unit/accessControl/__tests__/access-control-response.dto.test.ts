@@ -45,18 +45,18 @@ describe('AccessControlResponseDto', () => {
             moduleId: '507f1f77bcf86cd799439014',
             moduleName: 'Test Module',
             moduleCode: 'TEST_MOD',
-            roleConfigs: [
+            rolesAssigned: [
               {
                 roleId: '507f1f77bcf86cd799439015',
                 roleName: 'Test Role',
-                roleCode: 101,
+                roleCode: '101',
                 status: true,
               },
             ],
           },
         ],
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-02T00:00:00.000Z',
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-02'),
       });
     });
 
@@ -93,20 +93,20 @@ describe('AccessControlResponseDto', () => {
         moduleConfigs: [
           {
             moduleId: '507f1f77bcf86cd799439014',
-            moduleName: undefined,
-            moduleCode: undefined,
-            roleConfigs: [
+            moduleName: '',
+            moduleCode: '',
+            rolesAssigned: [
               {
                 roleId: '507f1f77bcf86cd799439015',
-                roleName: undefined,
-                roleCode: undefined,
+                roleName: '',
+                roleCode: '',
                 status: true,
               },
             ],
           },
         ],
-        createdAt: undefined,
-        updatedAt: undefined,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
       });
     });
 
@@ -127,8 +127,8 @@ describe('AccessControlResponseDto', () => {
         projectId: '507f1f77bcf86cd799439011',
         channelId: '507f1f77bcf86cd799439012',
         moduleConfigs: [],
-        createdAt: undefined,
-        updatedAt: undefined,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
       });
     });
 
@@ -160,21 +160,21 @@ describe('AccessControlResponseDto', () => {
         channelId: '507f1f77bcf86cd799439012',
         moduleConfigs: [
           {
-            moduleId: null,
-            moduleName: undefined,
-            moduleCode: undefined,
-            roleConfigs: [
+            moduleId: '',
+            moduleName: '',
+            moduleCode: '',
+            rolesAssigned: [
               {
-                roleId: null,
-                roleName: undefined,
-                roleCode: undefined,
+                roleId: '',
+                roleName: '',
+                roleCode: '',
                 status: true,
               },
             ],
           },
         ],
-        createdAt: undefined,
-        updatedAt: undefined,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
       });
     });
   });

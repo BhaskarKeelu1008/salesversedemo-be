@@ -2,23 +2,36 @@ import { App } from '@/app';
 import { DatabaseProvider } from '@/providers/database.provider';
 import type { Server } from 'http';
 import MongoStore from 'connect-mongo';
+import mongoose from 'mongoose';
+
+// Mock mongoose to prevent real database operations
+jest.mock('mongoose', () => ({
+  ...jest.requireActual('mongoose'),
+  connect: jest.fn().mockResolvedValue(undefined),
+  disconnect: jest.fn().mockResolvedValue(undefined),
+  connection: {
+    readyState: 1,
+    close: jest.fn().mockResolvedValue(undefined),
+  },
+}));
 
 jest.mock('@/providers/database.provider');
 jest.mock('@/config/passport', () => ({
   configurePassport: jest.fn(),
 }));
-jest.mock('connect-mongo', () => ({
-  create: jest.fn().mockReturnValue({
+jest.mock('connect-mongo', () => {
+  const mockStore = {
     close: jest.fn().mockResolvedValue(undefined),
-  }),
-}));
+  };
+  return {
+    create: jest.fn().mockReturnValue(mockStore),
+  };
+});
 
 describe('App', () => {
   let app: App;
   let mockServer: Partial<Server>;
-  const MockedDatabaseProvider = DatabaseProvider as jest.MockedClass<
-    typeof DatabaseProvider
-  >;
+  const MockedDatabaseProvider = DatabaseProvider as jest.MockedClass<typeof DatabaseProvider>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,13 +65,12 @@ describe('App', () => {
         if (cb) cb();
         return mockServer as Server;
       }),
+      listening: true,
     };
-    jest
-      .spyOn(app.getApp(), 'listen')
-      .mockImplementation((port: number, cb?: () => void) => {
-        if (cb) cb();
-        return mockServer as Server;
-      });
+    jest.spyOn(app.getApp(), 'listen').mockImplementation((port: number, cb?: () => void) => {
+      if (cb) cb();
+      return mockServer as Server;
+    });
   });
 
   afterEach(async () => {
@@ -101,9 +113,7 @@ describe('App', () => {
     });
 
     it('should handle database connection error', async () => {
-      MockedDatabaseProvider.prototype.connect.mockImplementation(() => {
-        throw new Error('Database connection failed');
-      });
+      MockedDatabaseProvider.prototype.connect.mockRejectedValueOnce(new Error('Database connection failed'));
       await expect(app.start()).rejects.toThrow('Database connection failed');
     });
 
