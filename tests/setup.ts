@@ -1,17 +1,26 @@
+import 'reflect-metadata';
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
-let mongoServer: MongoMemoryServer;
+// Suppress Mongoose warnings
+mongoose.set('strictQuery', false);
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  if (args[0]?.includes?.('[MONGOOSE]')) return;
+  originalWarn(...args);
+};
+
+let mongod: MongoMemoryServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  await mongoose.connect(mongoUri);
+  mongod = await MongoMemoryServer.create();
+  const uri = mongod.getUri();
+  await mongoose.connect(uri);
 });
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  await mongod.stop();
 });
 
 // Clear all collections after each test

@@ -2,6 +2,7 @@ import { BaseRepository } from '@/repository/base.repository';
 import {
   AccessControlModel,
   type IAccessControl,
+  type IModuleConfig,
 } from '@/models/access-control.model';
 import type {
   ModuleConfigDto,
@@ -9,7 +10,6 @@ import type {
 } from './dto/create-access-control.dto';
 import type { AccessControlQueryDto } from './dto/access-control-query.dto';
 import type { IAccessControlRepository } from './interfaces/access-control.interface';
-import type { IModuleConfig } from '@/models/module-config.model';
 import { ModuleModel } from '@/models/module.model';
 
 export class AccessControlRepository

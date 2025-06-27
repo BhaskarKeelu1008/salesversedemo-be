@@ -8,6 +8,7 @@ import type { UpdateResourceCenterDocumentDto } from './dto/update-resource-cent
 import { HTTP_STATUS } from '@/common/constants/http-status.constants';
 import { BaseController } from '@/controllers/base.controller';
 import logger from '@/common/utils/logger';
+import { DuplicateResourceException } from '@/common/exceptions/duplicate-resource.exception';
 
 interface ErrorWithMessage {
   message: string;
@@ -30,15 +31,31 @@ export class ResourceCenterController extends BaseController {
       const tag = await this.resourceCenterService.createTag(req.body);
       this.sendCreated(res, tag, 'Tag created successfully');
     } catch (error) {
-      const err = error as ErrorWithMessage;
+      const err = error as ErrorWithMessage & {
+        statusCode?: number;
+        isDuplicateError?: boolean;
+      };
       logger.error('Failed to create resource center tag:', {
         error: err.message,
         body: req.body,
       });
 
       // Handle duplicate tag error specifically
-      if (err.message.includes('already exists')) {
+      if (
+        error instanceof DuplicateResourceException ||
+        err.isDuplicateError ||
+        err.message.includes('already exists')
+      ) {
         this.sendError(res, err.message, HTTP_STATUS.CONFLICT, err);
+        return;
+      }
+
+      // Handle validation errors
+      if (
+        err.message.includes('required') ||
+        err.message.includes('cannot be empty')
+      ) {
+        this.sendError(res, err.message, HTTP_STATUS.BAD_REQUEST, err);
         return;
       }
 

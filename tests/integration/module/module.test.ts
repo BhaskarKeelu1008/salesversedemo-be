@@ -6,6 +6,8 @@ jest.setTimeout(30000);
 describe('Module Integration Tests', () => {
   beforeAll(async () => {
     await dbHandler.connect();
+    // Ensure indexes are created
+    await ModuleModel.createIndexes();
   });
 
   afterAll(async () => {
@@ -54,15 +56,16 @@ describe('Module Integration Tests', () => {
     });
 
     it('should not create a module with duplicate code', async () => {
+      // Create first module
       await ModuleModel.create(defaultModuleData);
 
       // Try to create another module with the same code
-      await expect(
-        ModuleModel.create({
+      await expect(async () => {
+        await ModuleModel.create({
           ...defaultModuleData,
           name: 'Another Module',
-        }),
-      ).rejects.toThrow(/E11000 duplicate key error/);
+        });
+      }).rejects.toThrow(/E11000 duplicate key error/);
     });
 
     it('should find a module by ID', async () => {

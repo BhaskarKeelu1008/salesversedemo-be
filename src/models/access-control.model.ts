@@ -10,7 +10,7 @@ interface IRoleConfig {
   status: boolean;
 }
 
-interface IModuleConfig {
+export interface IModuleConfig {
   moduleId: Types.ObjectId | IModule;
   roleConfigs: IRoleConfig[];
 }

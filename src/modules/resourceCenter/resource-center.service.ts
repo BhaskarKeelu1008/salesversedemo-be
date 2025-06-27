@@ -11,6 +11,7 @@ import type { IResourceCenterDocument } from '@/models/resource-center-document.
 import logger from '@/common/utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DuplicateResourceException } from '@/common/exceptions/duplicate-resource.exception';
 
 export class ResourceCenterService {
   private resourceCenterRepository: ResourceCenterRepository;
@@ -33,15 +34,31 @@ export class ResourceCenterService {
     try {
       logger.debug('Creating resource center tag', { tagName: data.tagName });
 
-      // Check for duplicate tag name
-      const existingTag = await this.resourceCenterRepository.findTagByName(
-        data.tagName,
-      );
-      if (existingTag) {
-        throw new Error(`Tag with name '${data.tagName}' already exists`);
+      // Validate input
+      if (!data.tagName || typeof data.tagName !== 'string') {
+        throw new Error('Tag name is required and must be a string');
       }
 
-      const tag = await this.resourceCenterRepository.createTag(data);
+      // Trim whitespace and validate
+      const trimmedTagName = data.tagName.trim();
+      if (trimmedTagName.length === 0) {
+        throw new Error('Tag name cannot be empty');
+      }
+
+      // Check for duplicate tag name with exact case-sensitive matching
+      const existingTag =
+        await this.resourceCenterRepository.findTagByName(trimmedTagName);
+
+      if (existingTag) {
+        // Create a custom error with specific message and status code
+        throw new DuplicateResourceException(
+          `Tag with name '${trimmedTagName}' already exists`,
+        );
+      }
+
+      // Create tag with trimmed name
+      const tagData = { ...data, tagName: trimmedTagName };
+      const tag = await this.resourceCenterRepository.createTag(tagData);
       return this.mapToResponseDto(tag);
     } catch (error) {
       logger.error('Failed to create resource center tag:', { error, data });

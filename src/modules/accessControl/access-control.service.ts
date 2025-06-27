@@ -13,6 +13,18 @@ export class AccessControlService implements IAccessControlService {
     this.accessControlRepository = new AccessControlRepository();
   }
 
+  private getRoleIdString(
+    roleId: string | { _id: string | { toString(): string } },
+  ): string {
+    if (typeof roleId === 'string') {
+      return roleId;
+    }
+    if (roleId && typeof roleId === 'object' && '_id' in roleId) {
+      return roleId._id.toString();
+    }
+    return '';
+  }
+
   private async getAllChannelRoles(channelId: string) {
     return RoleModel.find({
       channelId,
@@ -59,7 +71,7 @@ export class AccessControlService implements IAccessControlService {
           );
           // Get existing role IDs in this config
           const existingRoleIds = new Set(
-            config.roleConfigs.map(rc => rc.roleId._id.toString()),
+            config.roleConfigs.map(rc => this.getRoleIdString(rc.roleId)),
           );
           // Add any missing roles with status false
           const allRoleConfigs = [
@@ -76,14 +88,7 @@ export class AccessControlService implements IAccessControlService {
             moduleCode: moduleDetails.code,
             moduleName: moduleDetails.name,
             rolesAssigned: allRoleConfigs.map(rc => ({
-              roleId:
-                typeof rc.roleId === 'string'
-                  ? rc.roleId
-                  : rc.roleId &&
-                      typeof rc.roleId === 'object' &&
-                      '_id' in rc.roleId
-                    ? rc.roleId._id.toString()
-                    : '',
+              roleId: this.getRoleIdString(rc.roleId),
               status: rc.status,
             })),
           };

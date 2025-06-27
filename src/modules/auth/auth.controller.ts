@@ -32,6 +32,27 @@ const SEVEN_DAYS_IN_MS =
   MILLISECONDS_PER_SECOND;
 const MIN_PASSWORD_LENGTH = 8;
 
+interface ModuleAccessControl {
+  ModuleID: string;
+  ModuleName: string;
+  ModuleCode: string;
+  Status: boolean;
+}
+
+interface RoleConfig {
+  roleId: Types.ObjectId | string;
+  status: boolean;
+}
+
+interface ModuleConfig {
+  moduleId: {
+    _id: Types.ObjectId | string;
+    name: string;
+    code: string;
+  };
+  roleConfigs: RoleConfig[];
+}
+
 export class AuthController extends BaseController implements IAuthController {
   private authService: AuthService;
   private agentAuthService: AgentAuthService;
@@ -248,29 +269,37 @@ export class AuthController extends BaseController implements IAuthController {
     }
   }
 
-  private extractId(value: any): string | null {
+  private extractId(value: unknown): string | null {
     if (!value) return null;
-    
+
     if (typeof value === 'string') {
       return value;
     }
-    
+
     if (value instanceof Types.ObjectId) {
       return value.toString();
     }
-    
-    if (typeof value === 'object' && '_id' in value) {
-      return value._id
-      ? typeof value._id === 'string'
-        ? value._id
-        : (value._id as Types.ObjectId).toString()
-      : '';
+
+    if (typeof value === 'object' && value !== null && '_id' in value) {
+      const objWithId = value as { _id: string | Types.ObjectId };
+
+      if (!objWithId._id) {
+        return null;
+      }
+
+      if (typeof objWithId._id === 'string') {
+        return objWithId._id;
+      }
+
+      return objWithId._id.toString();
     }
-    
+
     return null;
   }
 
-  private async getRoleIdFromDesignation(designationId: string): Promise<string> {
+  private async getRoleIdFromDesignation(
+    designationId: string,
+  ): Promise<string> {
     const designation = await DesignationModel.findById(designationId).lean();
     if (!designation?.roleId) {
       throw new Error('Role information not found for designation');
@@ -282,15 +311,18 @@ export class AuthController extends BaseController implements IAuthController {
     return AccessControlModel.findOne({
       projectId: new Types.ObjectId(projectId),
       channelId: new Types.ObjectId(channelId),
-      isDeleted: false
+      isDeleted: false,
     })
-    .populate('moduleConfigs.moduleId', 'name code')
-    .lean();
+      .populate('moduleConfigs.moduleId', 'name code')
+      .lean();
   }
 
-  private buildModuleAccessControl(moduleConfig: any, roleId: string) {
-    const roleConfig = moduleConfig.roleConfigs.find(
-      (rc: any) => this.extractId(rc.roleId) === roleId
+  private buildModuleAccessControl(
+    moduleConfig: ModuleConfig,
+    roleId: string,
+  ): ModuleAccessControl | null {
+    const roleConfig = moduleConfig.roleConfigs?.find(
+      rc => this.extractId(rc.roleId) === roleId,
     );
 
     if (!roleConfig) {
@@ -298,15 +330,20 @@ export class AuthController extends BaseController implements IAuthController {
     }
 
     const moduleDetails = moduleConfig.moduleId;
-    if (!moduleDetails || typeof moduleDetails !== 'object' || !('name' in moduleDetails) || !('code' in moduleDetails)) {
+    if (!moduleDetails?.name || !moduleDetails.code) {
+      return null;
+    }
+
+    const moduleId = this.extractId(moduleDetails);
+    if (!moduleId) {
       return null;
     }
 
     return {
-      ModuleID: this.extractId(moduleDetails),
+      ModuleID: moduleId,
       ModuleName: moduleDetails.name,
       ModuleCode: moduleDetails.code,
-      Status: roleConfig.status
+      Status: roleConfig.status,
     };
   }
 
@@ -342,7 +379,10 @@ export class AuthController extends BaseController implements IAuthController {
       try {
         // Get role ID and access control config
         const roleId = await this.getRoleIdFromDesignation(designationId);
-        const accessControlConfig = await this.getAccessControlConfig(projectId, channelId);
+        const accessControlConfig = await this.getAccessControlConfig(
+          projectId,
+          channelId,
+        );
 
         if (!accessControlConfig) {
           this.sendBadRequest(res, 'Access control configuration not found');
@@ -351,7 +391,9 @@ export class AuthController extends BaseController implements IAuthController {
 
         // Build access control array
         const accessControl = accessControlConfig.moduleConfigs
-          .map(moduleConfig => this.buildModuleAccessControl(moduleConfig, roleId))
+          .map(moduleConfig =>
+            this.buildModuleAccessControl(moduleConfig as ModuleConfig, roleId),
+          )
           .filter(Boolean);
 
         this.sendSuccess(
@@ -360,13 +402,18 @@ export class AuthController extends BaseController implements IAuthController {
             agent,
             accessToken: tokens.accessToken,
             projects: tokens.projects,
-            accessControl
+            accessControl,
           },
           'OTP verified successfully',
         );
       } catch (error) {
         logger.error('Error processing access control:', error);
-        this.sendBadRequest(res, error instanceof Error ? error.message : 'Error processing access control');
+        this.sendBadRequest(
+          res,
+          error instanceof Error
+            ? error.message
+            : 'Error processing access control',
+        );
       }
     } catch (error) {
       this.handleVerifyOTPError(res, error);

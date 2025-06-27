@@ -73,7 +73,6 @@ export class App {
     this.app.use(
       cors({
         origin: this.config.corsOrigin ?? '* ',
-        // ['http://localhost:5173'],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
         credentials: true,
       }),
@@ -83,28 +82,40 @@ export class App {
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(cookieParser());
 
-    this.app.use(
-      session({
-        secret: this.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        store: MongoStore.create({
-          mongoUrl: this.config.database.uri,
-          dbName: this.config.database.dbName,
-          collectionName: 'sessions',
-          ttl: ONE_DAY_IN_SECONDS,
-          autoRemove: 'interval',
-          autoRemoveInterval: TEN_MINUTES,
-          touchAfter: ONE_DAY_IN_SECONDS,
+    // Skip session store in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.app.use(
+        session({
+          secret: this.SESSION_SECRET,
+          resave: false,
+          saveUninitialized: false,
+          store: new session.MemoryStore(),
         }),
-        cookie: {
-          secure: process.env.NODE_ENV === 'production',
-          httpOnly: true,
-          maxAge: ONE_DAY_IN_MS,
-          sameSite: 'lax',
-        },
-      }),
-    );
+      );
+    } else {
+      this.app.use(
+        session({
+          secret: this.SESSION_SECRET,
+          resave: false,
+          saveUninitialized: false,
+          store: MongoStore.create({
+            mongoUrl: this.config.database.uri,
+            dbName: this.config.database.dbName,
+            collectionName: 'sessions',
+            ttl: ONE_DAY_IN_SECONDS,
+            autoRemove: 'interval',
+            autoRemoveInterval: TEN_MINUTES,
+            touchAfter: ONE_DAY_IN_SECONDS,
+          }),
+          cookie: {
+            secure: process.env.NODE_ENV === 'production',
+            httpOnly: true,
+            maxAge: ONE_DAY_IN_MS,
+            sameSite: 'lax',
+          },
+        }),
+      );
+    }
   }
 
   private initializePassport(): void {
