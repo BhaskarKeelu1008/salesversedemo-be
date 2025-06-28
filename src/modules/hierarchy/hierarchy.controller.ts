@@ -73,13 +73,6 @@ export class HierarchyController
 
     if (error instanceof DatabaseValidationException) {
       this.sendBadRequest(res, err.message, err);
-    } else if (error instanceof DatabaseOperationException) {
-      this.sendError(
-        res,
-        'Database operation failed',
-        HTTP_STATUS.INTERNAL_SERVER_ERROR,
-        err,
-      );
     } else {
       this.sendError(
         res,

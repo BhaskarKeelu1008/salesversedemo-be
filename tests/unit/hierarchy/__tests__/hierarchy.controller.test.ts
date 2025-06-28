@@ -1,16 +1,26 @@
 import { HierarchyController } from '@/modules/hierarchy/hierarchy.controller';
 import { HierarchyService } from '@/modules/hierarchy/hierarchy.service';
 import { DatabaseValidationException } from '@/common/exceptions/database.exception';
-import { HTTP_STATUS, HIERARCHY } from '@/common/constants/http-status.constants';
+import {
+  HTTP_STATUS,
+  HIERARCHY,
+} from '@/common/constants/http-status.constants';
 import type { Request, Response } from 'express';
 import { mockRequest, mockResponse } from 'tests/utils/test-utils';
 import { Types } from 'mongoose';
 import type { HierarchyResponseDto } from '@/modules/hierarchy/dto/hierarchy-response.dto';
 
 jest.mock('@/modules/hierarchy/hierarchy.service');
-jest.mock('@/common/utils/logger');
+jest.mock('@/common/utils/logger', () => ({
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+}));
 
-function createMockHierarchyResponse(data: Partial<HierarchyResponseDto> = {}): HierarchyResponseDto {
+function createMockHierarchyResponse(
+  data: Partial<HierarchyResponseDto> = {},
+): HierarchyResponseDto {
   const now = new Date();
   return {
     _id: data._id || new Types.ObjectId().toString(),
@@ -38,7 +48,21 @@ describe('HierarchyController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockHierarchyService = new HierarchyService() as jest.Mocked<HierarchyService>;
+    mockHierarchyService = {
+      createHierarchy: jest.fn(),
+      getHierarchyById: jest.fn(),
+      getHierarchiesByChannel: jest.fn(),
+      getHierarchiesByChannelAndLevel: jest.fn(),
+      getRootHierarchies: jest.fn(),
+      getChildHierarchies: jest.fn(),
+      getAllHierarchies: jest.fn(),
+      getHierarchyTeamMemberList: jest.fn(),
+      updateHierarchy: jest.fn(),
+      deleteHierarchy: jest.fn(),
+      getHierarchyByAgentId: jest.fn(),
+      getAgentsByHierarchyDesignation: jest.fn(),
+    } as unknown as jest.Mocked<HierarchyService>;
+
     hierarchyController = new HierarchyController();
     (hierarchyController as any).hierarchyService = mockHierarchyService;
   });
@@ -58,20 +82,26 @@ describe('HierarchyController', () => {
         hierarchyStatus: mockHierarchyData.status as 'active' | 'inactive',
       });
 
-      mockHierarchyService.createHierarchy.mockResolvedValue(mockCreatedHierarchy);
+      mockHierarchyService.createHierarchy.mockResolvedValue(
+        mockCreatedHierarchy,
+      );
 
       const req = mockRequest(mockHierarchyData) as Request;
       const res = mockResponse() as Response;
 
       await hierarchyController.createHierarchy(req, res);
 
-      expect(mockHierarchyService.createHierarchy).toHaveBeenCalledWith(mockHierarchyData);
+      expect(mockHierarchyService.createHierarchy).toHaveBeenCalledWith(
+        mockHierarchyData,
+      );
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.CREATED);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        message: 'Hierarchy created successfully',
-        data: mockCreatedHierarchy,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Hierarchy created successfully',
+          data: mockCreatedHierarchy,
+        }),
+      );
     });
 
     it('should handle validation error', async () => {
@@ -84,10 +114,12 @@ describe('HierarchyController', () => {
       await hierarchyController.createHierarchy(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Validation failed',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Validation failed',
+        }),
+      );
     });
   });
 
@@ -104,13 +136,17 @@ describe('HierarchyController', () => {
 
       await hierarchyController.getHierarchyById(req, res);
 
-      expect(mockHierarchyService.getHierarchyById).toHaveBeenCalledWith(mockId);
+      expect(mockHierarchyService.getHierarchyById).toHaveBeenCalledWith(
+        mockId,
+      );
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.OK);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        message: 'Hierarchy retrieved successfully',
-        data: mockHierarchy,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Hierarchy retrieved successfully',
+          data: mockHierarchy,
+        }),
+      );
     });
 
     it('should handle not found error', async () => {
@@ -122,10 +158,12 @@ describe('HierarchyController', () => {
       await hierarchyController.getHierarchyById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.NOT_FOUND);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Hierarchy not found',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Hierarchy not found',
+        }),
+      );
     });
 
     it('should handle missing id parameter', async () => {
@@ -135,10 +173,12 @@ describe('HierarchyController', () => {
       await hierarchyController.getHierarchyById(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Hierarchy ID is required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Hierarchy ID is required',
+        }),
+      );
     });
   });
 
@@ -153,7 +193,9 @@ describe('HierarchyController', () => {
         }),
       ];
 
-      mockHierarchyService.getHierarchiesByChannelAndLevel.mockResolvedValue(mockHierarchies);
+      mockHierarchyService.getHierarchiesByChannelAndLevel.mockResolvedValue(
+        mockHierarchies,
+      );
 
       const req = mockRequest(
         {},
@@ -164,16 +206,17 @@ describe('HierarchyController', () => {
 
       await hierarchyController.getHierarchiesByChannelAndLevel(req, res);
 
-      expect(mockHierarchyService.getHierarchiesByChannelAndLevel).toHaveBeenCalledWith(
-        mockChannelId,
-        parseInt(mockLevel),
-      );
+      expect(
+        mockHierarchyService.getHierarchiesByChannelAndLevel,
+      ).toHaveBeenCalledWith(mockChannelId, parseInt(mockLevel));
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.OK);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        message: 'Hierarchies retrieved successfully',
-        data: mockHierarchies,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Hierarchies retrieved successfully',
+          data: mockHierarchies,
+        }),
+      );
     });
 
     it('should handle missing channel id', async () => {
@@ -183,10 +226,12 @@ describe('HierarchyController', () => {
       await hierarchyController.getHierarchiesByChannelAndLevel(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Channel ID is required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Channel ID is required',
+        }),
+      );
     });
 
     it('should handle missing level', async () => {
@@ -196,10 +241,12 @@ describe('HierarchyController', () => {
       await hierarchyController.getHierarchiesByChannelAndLevel(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Level is required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Level is required',
+        }),
+      );
     });
 
     it('should handle invalid level', async () => {
@@ -213,10 +260,12 @@ describe('HierarchyController', () => {
       await hierarchyController.getHierarchiesByChannelAndLevel(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: `Level must be at least ${HIERARCHY.MIN_LEVEL}`,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: `Level must be at least ${HIERARCHY.MIN_LEVEL}`,
+        }),
+      );
     });
   });
 
@@ -236,60 +285,68 @@ describe('HierarchyController', () => {
         },
       ];
 
-      mockHierarchyService.getHierarchyTeamMemberList.mockResolvedValue(mockTeamMembers);
+      mockHierarchyService.getHierarchyTeamMemberList.mockResolvedValue(
+        mockTeamMembers,
+      );
 
-      const req = mockRequest(
-        {},
-        {},
-        { teamMembers: 'true' },
-        { currentuser: JSON.stringify(mockCurrentUser) },
-      ) as Request;
+      const req = {
+        query: { teamMembers: 'true' },
+        headers: { currentuser: JSON.stringify(mockCurrentUser) },
+      } as unknown as Request;
+
       const res = mockResponse() as Response;
 
       await hierarchyController.getHierarchyTeamMemberList(req, res);
 
-      expect(mockHierarchyService.getHierarchyTeamMemberList).toHaveBeenCalledWith(
-        mockChannelId,
-        mockUserId,
-        true,
-      );
+      expect(
+        mockHierarchyService.getHierarchyTeamMemberList,
+      ).toHaveBeenCalledWith(mockChannelId, mockUserId, true);
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.OK);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        message: 'Data retrieved successfully',
-        data: mockTeamMembers,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Data retrieved successfully',
+          data: mockTeamMembers,
+        }),
+      );
     });
 
     it('should handle missing current user header', async () => {
-      const req = mockRequest({}, {}, { teamMembers: 'true' }) as Request;
+      const req = {
+        query: { teamMembers: 'true' },
+        headers: {},
+      } as unknown as Request;
+
       const res = mockResponse() as Response;
 
       await hierarchyController.getHierarchyTeamMemberList(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Current user information is required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Current user information is required',
+        }),
+      );
     });
 
     it('should handle missing channel id in current user', async () => {
-      const req = mockRequest(
-        {},
-        {},
-        { teamMembers: 'true' },
-        { currentuser: JSON.stringify({ id: mockUserId }) },
-      ) as Request;
+      const req = {
+        query: { teamMembers: 'true' },
+        headers: { currentuser: JSON.stringify({ id: mockUserId }) },
+      } as unknown as Request;
+
       const res = mockResponse() as Response;
 
       await hierarchyController.getHierarchyTeamMemberList(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Channel ID and User ID are required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Channel ID and User ID are required',
+        }),
+      );
     });
   });
 
@@ -306,20 +363,27 @@ describe('HierarchyController', () => {
         ...mockUpdateData,
       });
 
-      mockHierarchyService.updateHierarchy.mockResolvedValue(mockUpdatedHierarchy);
+      mockHierarchyService.updateHierarchy.mockResolvedValue(
+        mockUpdatedHierarchy,
+      );
 
       const req = mockRequest(mockUpdateData, { id: mockId }) as Request;
       const res = mockResponse() as Response;
 
       await hierarchyController.updateHierarchy(req, res);
 
-      expect(mockHierarchyService.updateHierarchy).toHaveBeenCalledWith(mockId, mockUpdateData);
+      expect(mockHierarchyService.updateHierarchy).toHaveBeenCalledWith(
+        mockId,
+        mockUpdateData,
+      );
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.OK);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        message: 'Hierarchy updated successfully',
-        data: mockUpdatedHierarchy,
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Hierarchy updated successfully',
+          data: mockUpdatedHierarchy,
+        }),
+      );
     });
 
     it('should handle missing id parameter', async () => {
@@ -329,10 +393,12 @@ describe('HierarchyController', () => {
       await hierarchyController.updateHierarchy(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Hierarchy ID is required',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Hierarchy ID is required',
+        }),
+      );
     });
 
     it('should handle empty update data', async () => {
@@ -342,10 +408,12 @@ describe('HierarchyController', () => {
       await hierarchyController.updateHierarchy(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.BAD_REQUEST);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'At least one field is required for update',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'At least one field is required for update',
+        }),
+      );
     });
 
     it('should handle not found error', async () => {
@@ -357,10 +425,12 @@ describe('HierarchyController', () => {
       await hierarchyController.updateHierarchy(req, res);
 
       expect(res.status).toHaveBeenCalledWith(HTTP_STATUS.NOT_FOUND);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        message: 'Hierarchy not found',
-      }));
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: 'Hierarchy not found',
+        }),
+      );
     });
   });
-}); 
+});

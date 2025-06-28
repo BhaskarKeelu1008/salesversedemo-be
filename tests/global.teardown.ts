@@ -8,7 +8,9 @@ export default async function globalTeardown() {
       console.log('Closed Mongoose connection');
     }
 
-    const mongoServer = (global as any).__MONGOSERVER__ as MongoMemoryServer;
+    const mongoServer = (
+      global as unknown as { __MONGOSERVER__: MongoMemoryServer }
+    ).__MONGOSERVER__;
     if (mongoServer) {
       await mongoServer.stop();
       console.log('Stopped MongoDB Memory Server');
@@ -17,4 +19,4 @@ export default async function globalTeardown() {
     console.error('Error cleaning up MongoDB Memory Server', error);
     throw error;
   }
-} 
+}

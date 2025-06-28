@@ -9,10 +9,13 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 
-// Clear all collections after each test
+// Clear all collections after each test, but only if we're using a real database
 afterEach(async () => {
+  // Skip if mongoose is mocked (connection.collections is a mock object)
+  if (process.env.MOCK_MONGOOSE === 'true') return;
+
   const collections = mongoose.connection.collections;
   for (const key in collections) {
     await collections[key].deleteMany({});
   }
-}); 
+});

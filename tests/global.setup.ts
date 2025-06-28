@@ -24,9 +24,11 @@ export default async function globalSetup() {
     console.log('Connected to MongoDB Memory Server');
 
     // Store the server instance so we can access it in teardown
-    (global as any).__MONGOSERVER__ = mongoServer;
+    (
+      global as typeof global & { __MONGOSERVER__: MongoMemoryServer }
+    ).__MONGOSERVER__ = mongoServer;
   } catch (error) {
     console.error('Failed to start MongoDB Memory Server', error);
     throw error;
   }
-} 
+}
